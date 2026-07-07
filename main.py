@@ -241,6 +241,8 @@ def run_bot():
 # ============ ЗАПУСК ============
 
 if __name__ == "__main__":
+    import os
+    
     # Инициализируем базу данных
     init_db()
     print("✅ База данных инициализирована")
@@ -249,6 +251,7 @@ if __name__ == "__main__":
     bot_thread = threading.Thread(target=run_bot, daemon=True)
     bot_thread.start()
     
-    # Запускаем веб-сервер
-    print("🚀 Сервер запускается на http://localhost:8000")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Берем порт из переменной окружения (Railway), или 8000 по умолчанию
+    port = int(os.getenv("PORT", 8000))
+    print(f"🚀 Сервер запускается на порту {port}")
+    uvicorn.run(app, host="0.0.0.0", port=port)
