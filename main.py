@@ -10,7 +10,7 @@ import threading
 from datetime import date
 import os
 
-from database import (
+from database_mysql import (
     init_db, get_or_create_user, save_bzu_record, 
     get_today_records, get_user_record, get_user_limits,
     get_all_users, update_limits
