@@ -243,6 +243,12 @@ def run_bot():
 if __name__ == "__main__":
     import os
     
+    # ===== ЯВНО СОЗДАЕМ ТАБЛИЦЫ =====
+    from database import init_db
+    print("🔧 Создаю таблицы...")
+    init_db()
+    print("✅ Таблицы созданы")
+    
     # Инициализируем базу данных
     init_db()
     print("✅ База данных инициализирована")
