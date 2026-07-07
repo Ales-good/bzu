@@ -1,4 +1,5 @@
-fastapi==0.118.0
+fastapi==0.115.6
 uvicorn==0.34.0
 python-telegram-bot==21.10
 python-multipart==0.0.20
+pymysql==1.1.1
