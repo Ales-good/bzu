@@ -11,11 +11,10 @@ def get_db():
     return conn
 
 def init_db():
-    """Создаем таблицы"""
     conn = get_db()
     cursor = conn.cursor()
     
-    # Таблица пользователей
+    # Создаем таблицы
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
@@ -26,7 +25,6 @@ def init_db():
         )
     ''')
     
-    # Таблица записей БЖУ
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS bzu_records (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,7 +41,6 @@ def init_db():
         )
     ''')
     
-    # Таблица лимитов с диапазонами
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS limits (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -62,6 +59,12 @@ def init_db():
     ''')
     
     conn.commit()
+    
+    # ПРОВЕРЯЕМ, ЧТО ТАБЛИЦЫ СОЗДАЛИСЬ
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    tables = cursor.fetchall()
+    print(f"📋 Созданы таблицы: {[t[0] for t in tables]}")
+    
     conn.close()
 
 # ============ CRUD ДЛЯ ПОЛЬЗОВАТЕЛЕЙ ============
