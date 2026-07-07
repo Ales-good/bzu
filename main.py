@@ -17,7 +17,7 @@ from database import (
 
 # ============ НАСТРОЙКИ ============
 TELEGRAM_TOKEN = "ВАШ_ТОКЕН_ОТ_BOTFATHER"
-WEBAPP_URL = "bzu-production.up.railway.app"
+WEBAPP_URL = "https://bzu-production.up.railway.app"
 
 app = FastAPI()
 
