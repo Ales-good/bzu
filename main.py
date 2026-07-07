@@ -8,6 +8,7 @@ import uvicorn
 import json
 import threading
 from datetime import date
+import os
 
 from database import (
     init_db, get_or_create_user, save_bzu_record, 
@@ -15,13 +16,18 @@ from database import (
     get_all_users, update_limits
 )
 
+# ============ ПРИНУДИТЕЛЬНО СОЗДАЕМ ТАБЛИЦЫ ============
+print("🔧 Инициализация БД...")
+init_db()
+print("✅ БД готова")
+
 # ============ НАСТРОЙКИ ============
-TELEGRAM_TOKEN = "ВАШ_ТОКЕН_ОТ_BOTFATHER"
-WEBAPP_URL = "https://bzu-production.up.railway.app"
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "ВАШ_ТОКЕН_ОТ_BOTFATHER")
+WEBAPP_URL = os.getenv("WEBAPP_URL", "https://bzu-production.up.railway.app")
 
 app = FastAPI()
 
-# CORS для разработки
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -30,10 +36,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Раздаем статику
+# Статика
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# ============ МОДЕЛИ ДАННЫХ ============
+# ============ МОДЕЛИ ============
 class BZUData(BaseModel):
     user_id: int
     protein: float = 0
@@ -53,15 +59,13 @@ class LimitsData(BaseModel):
     fiber_min: float
     fiber_max: float
 
-# ============ API ЭНДПОИНТЫ ============
-
+# ============ API ============
 @app.get("/")
 async def index():
     return FileResponse("static/index.html")
 
 @app.get("/api/user/{user_id}")
 async def get_user(user_id: int):
-    """Получаем или создаем пользователя"""
     user = get_or_create_user(user_id)
     limits = get_user_limits(user_id)
     today_record = get_user_record(user_id)
@@ -79,7 +83,6 @@ async def get_user(user_id: int):
 
 @app.post("/api/save")
 async def save_data(data: BZUData):
-    """Сохраняем запись БЖУ"""
     try:
         save_bzu_record(
             data.user_id,
@@ -93,20 +96,26 @@ async def save_data(data: BZUData):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+def get_status(value, min_val, max_val):
+    if value == 0:
+        return 'empty'
+    elif value < min_val:
+        return 'under'
+    elif value > max_val:
+        return 'over'
+    else:
+        return 'good'
+
 @app.get("/api/today")
 async def get_today():
-    """Получаем все записи за сегодня"""
     records = get_today_records()
     
-    # Добавляем статусы для каждого показателя
     for rec in records:
-        # Проверяем, в пределах ли нормы
         rec['protein_status'] = get_status(rec['protein'], rec['protein_min'], rec['protein_max'])
         rec['fat_status'] = get_status(rec['fat'], rec['fat_min'], rec['fat_max'])
         rec['carbs_status'] = get_status(rec['carbs'], rec['carbs_min'], rec['carbs_max'])
         rec['fiber_status'] = get_status(rec['fiber'], rec['fiber_min'], rec['fiber_max'])
         
-        # Общий статус
         statuses = [rec['protein_status'], rec['fat_status'], rec['carbs_status'], rec['fiber_status']]
         if all(s == 'good' for s in statuses):
             rec['overall_status'] = 'good'
@@ -119,25 +128,12 @@ async def get_today():
     
     return records
 
-def get_status(value, min_val, max_val):
-    """Определяем статус показателя"""
-    if value == 0:
-        return 'empty'
-    elif value < min_val:
-        return 'under'
-    elif value > max_val:
-        return 'over'
-    else:
-        return 'good'
-
 @app.get("/api/users")
 async def get_users():
-    """Получаем список всех пользователей"""
     return get_all_users()
 
 @app.post("/api/limits")
 async def update_limits_endpoint(data: LimitsData):
-    """Обновляем лимиты пользователя"""
     try:
         update_limits(
             data.user_id,
@@ -155,12 +151,10 @@ async def update_limits_endpoint(data: LimitsData):
         raise HTTPException(status_code=400, detail=str(e))
 
 # ============ ТЕЛЕГРАМ БОТ ============
-
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import Application, CommandHandler, ContextTypes
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Отправляем кнопку с WebApp"""
     keyboard = [[
         InlineKeyboardButton(
             "📊 Открыть дневник БЖУ",
@@ -193,25 +187,20 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Отправляем текстовую сводку в чат"""
     records = get_today_records()
     
     if not records or all(r['protein'] == 0 and r['fat'] == 0 and r['carbs'] == 0 and r['fiber'] == 0 for r in records):
         await update.message.reply_text("📭 Сегодня никто не ввел данные. Нажми 'Открыть дневник БЖУ'!")
         return
     
-    # Формируем красивое сообщение
     message = "📊 <b>Сводка за сегодня</b>\n\n"
     
     for rec in records:
         name = rec['first_name'] or rec['username'] or f"User {rec['user_id']}"
-        
-        # Проверяем, вводил ли пользователь что-то
         total = rec['protein'] + rec['fat'] + rec['carbs'] + rec['fiber']
         if total == 0:
             continue
             
-        # Эмодзи статуса
         status_emoji = {
             'good': '✅',
             'under': '⬇️',
@@ -228,7 +217,6 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(message, parse_mode='HTML')
 
 def run_bot():
-    """Запускаем Telegram бота в отдельном потоке"""
     bot_app = Application.builder().token(TELEGRAM_TOKEN).build()
     
     bot_app.add_handler(CommandHandler("start", start))
@@ -239,25 +227,12 @@ def run_bot():
     bot_app.run_polling()
 
 # ============ ЗАПУСК ============
-
 if __name__ == "__main__":
-    import os
-    
-    # ===== ЯВНО СОЗДАЕМ ТАБЛИЦЫ =====
-    from database import init_db
-    print("🔧 Создаю таблицы...")
-    init_db()
-    print("✅ Таблицы созданы")
-    
-    # Инициализируем базу данных
-    init_db()
-    print("✅ База данных инициализирована")
-    
     # Запускаем бота в отдельном потоке
     bot_thread = threading.Thread(target=run_bot, daemon=True)
     bot_thread.start()
     
-    # Берем порт из переменной окружения (Railway), или 8000 по умолчанию
+    # Берем порт из переменной окружения
     port = int(os.getenv("PORT", 8000))
     print(f"🚀 Сервер запускается на порту {port}")
     uvicorn.run(app, host="0.0.0.0", port=port)
