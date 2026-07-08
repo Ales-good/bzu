@@ -216,6 +216,23 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(message, parse_mode='HTML')
 
+from telegram import BotCommand, BotCommandScopeChat
+
+async def set_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Устанавливает команды для группы"""
+    commands = [
+        BotCommand("start", "📊 Открыть дневник БЖУ"),
+        BotCommand("stats", "📈 Сводка за сегодня"),
+        BotCommand("help", "❓ Помощь"),
+    ]
+    
+    # Для конкретной группы
+    if update.effective_chat:
+        await context.bot.set_my_commands(
+            commands,
+            scope=BotCommandScopeChat(chat_id=update.effective_chat.id)
+        )
+
 def run_bot():
     bot_app = Application.builder().token(TELEGRAM_TOKEN).build()
     
