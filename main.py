@@ -265,7 +265,7 @@ if __name__ == "__main__":
     print("🚀 Запуск приложения...")
     
     # Проверяем токен
-    if not TELEGRAM_TOKEN or TELEGRAM_TOKEN == "ВАШ_ТОКЕН_ОТ_BOTFATHER":
+    if not TELEGRAM_TOKEN or TELEGRAM_TOKEN == "8704240954:AAG4AV6Wrt_9aQhn400ljcWTNq80gc0LpWM":
         print("❌ ОШИБКА: TELEGRAM_TOKEN не задан или используется заглушка!")
         print("💡 Добавь TELEGRAM_TOKEN в переменные окружения на Railway")
     else:
