@@ -5,39 +5,23 @@ from typing import List, Dict, Optional
 import re
 
 def get_db():
-    """Подключаемся к MySQL"""
+    """Подключаемся к MySQL (прямое подключение)"""
     
-    # Пробуем получить MYSQL_URL
-    mysql_url = os.getenv("MYSQL_URL")
+    # Данные из твоей консоли Railway
+    host = "mysql.railway.internal"
+    user = "root"
+    password = "ZblKDXodWUWBsbvhprKbKLXEzkEgYOfC"
+    database = "railway"
+    port = 3306
     
-    if mysql_url:
-        # Парсим URL
-        pattern = r'mysql://([^:]+):([^@]+)@([^:]+):(\d+)/(.+)'
-        match = re.match(pattern, mysql_url)
-        if match:
-            user, password, host, port, database = match.groups()
-            print(f"🔌 Подключение к MySQL: {host}:{port}/{database}")
-        else:
-            raise Exception(f"❌ Неверный формат MYSQL_URL")
-    else:
-        # Используем отдельные переменные
-        host = os.getenv("MYSQLHOST")
-        user = os.getenv("MYSQLUSER")
-        password = os.getenv("MYSQLPASSWORD")
-        database = os.getenv("MYSQLDATABASE")
-        port = int(os.getenv("MYSQLPORT", 3306))
-        
-        if not all([host, user, password, database]):
-            raise Exception("❌ Не найдены переменные для подключения к MySQL!")
-        
-        print(f"🔌 Подключение к MySQL: {host}:{port}/{database}")
+    print(f"🔌 Подключение к MySQL: {host}:{port}/{database}")
     
     conn = pymysql.connect(
         host=host,
         user=user,
         password=password,
         database=database,
-        port=int(port),
+        port=port,
         charset='utf8mb4',
         cursorclass=pymysql.cursors.DictCursor,
         autocommit=False,
