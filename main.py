@@ -155,6 +155,18 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppI
 from telegram.ext import Application, CommandHandler, ContextTypes
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обрабатывает /start и в личке, и в группе"""
+    
+    if not update.message:
+        return
+    
+    user = update.effective_user
+    chat = update.effective_chat
+    
+    # Логируем для отладки
+    print(f"📩 /start от {user.first_name} (ID: {user.id}) в чате: {chat.type if chat else 'unknown'}")
+    
+    # Кнопка с WebApp
     keyboard = [[
         InlineKeyboardButton(
             "📊 Открыть дневник БЖУ",
@@ -162,18 +174,25 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     ]]
     
+    # Сообщение для группы и для лички
+    if chat and chat.type in ['group', 'supergroup']:
+        text = (
+            "👋 Привет! Я бот для учета БЖУ в этой группе.\n\n"
+            "📝 Нажми на кнопку ниже, чтобы открыть дневник.\n"
+            "Там ты сможешь:\n"
+            "✅ Вводить свои показатели\n"
+            "📈 Смотреть график сравнения с участниками\n"
+            "🏆 Отмечать план выполнения (массаж, баня, спорт)"
+        )
+    else:
+        text = (
+            "👋 Привет! Я бот для учета БЖУ.\n\n"
+            "📝 Нажми на кнопку ниже, чтобы открыть дневник.\n"
+            "Добавь меня в группу, чтобы сравнивать результаты!"
+        )
+    
     await update.message.reply_text(
-        "👋 Привет! Я бот для учета БЖУ.\n\n"
-        "📝 Нажми на кнопку ниже, чтобы открыть дневник.\n"
-        "Там ты сможешь:\n"
-        "✅ Вводить свои показатели\n"
-        "📈 Смотреть график сравнения с участниками\n"
-        "🎯 Отслеживать выполнение нормы\n\n"
-        "📊 Нормы:\n"
-        "🍗 Белки: 150-200г\n"
-        "🧈 Жиры: 70-80г\n"
-        "🍞 Углеводы: 80-100г\n"
-        "🥦 Клетчатка: 10-20г",
+        text,
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
@@ -184,73 +203,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/help - Показать это сообщение\n"
         "/stats - Показать сводку за сегодня в чате\n\n"
         "Для ввода данных используй кнопку 'Открыть дневник БЖУ'"
-    )
-
-async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    records = get_today_records()
-    
-    if not records or all(r['protein'] == 0 and r['fat'] == 0 and r['carbs'] == 0 and r['fiber'] == 0 for r in records):
-        await update.message.reply_text("📭 Сегодня никто не ввел данные. Нажми 'Открыть дневник БЖУ'!")
-        return
-    
-    message = "📊 <b>Сводка за сегодня</b>\n\n"
-    
-    for rec in records:
-        name = rec['first_name'] or rec['username'] or f"User {rec['user_id']}"
-        total = rec['protein'] + rec['fat'] + rec['carbs'] + rec['fiber']
-        if total == 0:
-            continue
-            
-        status_emoji = {
-            'good': '✅',
-            'under': '⬇️',
-            'over': '⬆️',
-            'empty': '⚪'
-        }
-            
-        message += f"👤 <b>{name}</b>\n"
-        message += f"  🍗 Белки: {rec['protein']:.0f}г ({rec['protein_min']:.0f}-{rec['protein_max']:.0f}) {status_emoji.get(rec['protein_status'], '')}\n"
-        message += f"  🧈 Жиры: {rec['fat']:.0f}г ({rec['fat_min']:.0f}-{rec['fat_max']:.0f}) {status_emoji.get(rec['fat_status'], '')}\n"
-        message += f"  🍞 Углеводы: {rec['carbs']:.0f}г ({rec['carbs_min']:.0f}-{rec['carbs_max']:.0f}) {status_emoji.get(rec['carbs_status'], '')}\n"
-        message += f"  🥦 Клетчатка: {rec['fiber']:.0f}г ({rec['fiber_min']:.0f}-{rec['fiber_max']:.0f}) {status_emoji.get(rec['fiber_status'], '')}\n\n"
-    
-    await update.message.reply_text(message, parse_mode='HTML')
-
-from telegram import BotCommand, BotCommandScopeChat
-
-async def set_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Устанавливает команды для группы"""
-    commands = [
-        BotCommand("start", "📊 Открыть дневник БЖУ"),
-        BotCommand("stats", "📈 Сводка за сегодня"),
-        BotCommand("help", "❓ Помощь"),
-    ]
-    
-    # Для конкретной группы
-    if update.effective_chat:
-        await context.bot.set_my_commands(
-            commands,
-            scope=BotCommandScopeChat(chat_id=update.effective_chat.id)
-        )
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Кнопка с WebApp для группы"""
-    keyboard = [[
-        InlineKeyboardButton(
-            "📊 Открыть дневник БЖУ",
-            web_app=WebAppInfo(url=WEBAPP_URL)
-        )
-    ]]
-    
-    await update.message.reply_text(
-        "👋 Привет! Я бот для учета БЖУ в этой группе.\n\n"
-        "📝 Нажми на кнопку ниже, чтобы открыть дневник.\n"
-        "Там ты сможешь:\n"
-        "✅ Вводить свои показатели\n"
-        "📈 Смотреть график сравнения с участниками\n"
-        "🎯 Отслеживать выполнение нормы\n"
-        "🏆 Отмечать план выполнения (массаж, баня, спорт и т.д.)",
-        reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -283,7 +235,6 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message += f"  🥦 Клетчатка: {rec['fiber']:.0f}г ({rec['fiber_min']:.0f}-{rec['fiber_max']:.0f}) {status_emoji.get(rec['fiber_status'], '')}\n\n"
     
     await update.message.reply_text(message, parse_mode='HTML')
-    
 
 def run_bot():
     bot_app = Application.builder().token(TELEGRAM_TOKEN).build()
