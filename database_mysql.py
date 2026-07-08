@@ -5,26 +5,43 @@ from typing import List, Dict, Optional
 import re
 
 def get_db():
-    """Подключаемся к MySQL используя переменные окружения Railway"""
+    """Подключаемся к MySQL"""
     
-    # Берем переменные из окружения
-    host = os.getenv("MYSQLHOST")
-    user = os.getenv("MYSQLUSER")
-    password = os.getenv("MYSQLPASSWORD")
-    database = os.getenv("MYSQLDATABASE")
-    port = int(os.getenv("MYSQLPORT", 3306))
+    # Пробуем получить MYSQL_URL
+    mysql_url = os.getenv("MYSQL_URL")
     
-    print(f"🔌 Подключение к MySQL: {host}:{port}/{database} пользователь {user}")
+    if mysql_url:
+        # Парсим URL
+        pattern = r'mysql://([^:]+):([^@]+)@([^:]+):(\d+)/(.+)'
+        match = re.match(pattern, mysql_url)
+        if match:
+            user, password, host, port, database = match.groups()
+            print(f"🔌 Подключение к MySQL: {host}:{port}/{database}")
+        else:
+            raise Exception(f"❌ Неверный формат MYSQL_URL")
+    else:
+        # Используем отдельные переменные
+        host = os.getenv("MYSQLHOST")
+        user = os.getenv("MYSQLUSER")
+        password = os.getenv("MYSQLPASSWORD")
+        database = os.getenv("MYSQLDATABASE")
+        port = int(os.getenv("MYSQLPORT", 3306))
+        
+        if not all([host, user, password, database]):
+            raise Exception("❌ Не найдены переменные для подключения к MySQL!")
+        
+        print(f"🔌 Подключение к MySQL: {host}:{port}/{database}")
     
     conn = pymysql.connect(
         host=host,
         user=user,
         password=password,
         database=database,
-        port=port,
+        port=int(port),
         charset='utf8mb4',
         cursorclass=pymysql.cursors.DictCursor,
-        autocommit=False
+        autocommit=False,
+        connect_timeout=10
     )
     return conn
 
@@ -82,7 +99,7 @@ def init_db():
     
     conn.commit()
     
-    # Проверяем, что таблицы создались
+    # Проверяем
     cursor.execute("SHOW TABLES")
     tables = cursor.fetchall()
     table_names = [list(t.values())[0] for t in tables]
@@ -90,13 +107,10 @@ def init_db():
     
     conn.close()
 
-# ============ CRUD ДЛЯ ПОЛЬЗОВАТЕЛЕЙ ============
-
 def get_or_create_user(user_id: int, username: str = None, first_name: str = None, last_name: str = None) -> Dict:
     conn = get_db()
     cursor = conn.cursor()
     
-    # Проверяем, есть ли пользователь
     cursor.execute("SELECT * FROM users WHERE user_id = %s", (user_id,))
     user = cursor.fetchone()
     
@@ -106,7 +120,6 @@ def get_or_create_user(user_id: int, username: str = None, first_name: str = Non
             VALUES (%s, %s, %s, %s)
         ''', (user_id, username, first_name, last_name))
         
-        # Создаем лимиты по умолчанию
         cursor.execute('''
             INSERT INTO limits (user_id, protein_min, protein_max, fat_min, fat_max, carbs_min, carbs_max, fiber_min, fiber_max)
             VALUES (%s, 150, 200, 70, 80, 80, 100, 10, 20)
@@ -127,8 +140,6 @@ def get_all_users() -> List[Dict]:
     users = cursor.fetchall()
     conn.close()
     return users
-
-# ============ CRUD ДЛЯ ЗАПИСЕЙ БЖУ ============
 
 def save_bzu_record(user_id: int, protein: float, fat: float, carbs: float, fiber: float, record_date: str = None):
     if not record_date:
@@ -152,7 +163,6 @@ def save_bzu_record(user_id: int, protein: float, fat: float, carbs: float, fibe
     conn.close()
 
 def get_today_records() -> List[Dict]:
-    """Получаем записи всех пользователей за сегодня"""
     today = date.today().isoformat()
     conn = get_db()
     cursor = conn.cursor()
@@ -199,8 +209,6 @@ def get_user_record(user_id: int, record_date: str = None) -> Optional[Dict]:
     record = cursor.fetchone()
     conn.close()
     return record
-
-# ============ ЛИМИТЫ ============
 
 def get_user_limits(user_id: int) -> Dict:
     conn = get_db()
