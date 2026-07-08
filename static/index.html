@@ -23,13 +23,11 @@
             --radius: 20px;
             --glass: rgba(255, 255, 255, 0.03);
             
-            /* Цвета для показателей */
             --protein: #FF6B6B;
             --fat: #FFD93D;
             --carbs: #6BCB77;
             --fiber: #4D96FF;
             
-            /* Градиенты */
             --gradient-main: linear-gradient(135deg, #FF6B6B, #FFD93D, #6BCB77, #4D96FF);
             --gradient-card: linear-gradient(135deg, rgba(255, 107, 107, 0.1), rgba(77, 150, 255, 0.1));
         }
@@ -46,7 +44,6 @@
             position: relative;
         }
         
-        /* Фоновый градиент */
         body::before {
             content: '';
             position: fixed;
@@ -216,7 +213,7 @@
         .card-title {
             font-size: 16px;
             font-weight: 600;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
             display: flex;
             align-items: center;
             gap: 10px;
@@ -229,7 +226,109 @@
             color: var(--text-secondary);
             margin-left: auto;
         }
+
+        .card-title .badge-done {
+            font-size: 12px;
+            background: rgba(107, 203, 119, 0.2);
+            color: #6BCB77;
+            padding: 2px 12px;
+            border-radius: 12px;
+            font-weight: 500;
+        }
+
+        .card-title .badge-pending {
+            font-size: 12px;
+            background: rgba(255, 107, 107, 0.2);
+            color: #FF6B6B;
+            padding: 2px 12px;
+            border-radius: 12px;
+            font-weight: 500;
+        }
         
+        /* ============ ПЛАН ВЫПОЛНЕНИЯ ============ */
+        .plan-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .plan-item {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 14px;
+            padding: 12px 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .plan-item:active {
+            transform: scale(0.96);
+        }
+
+        .plan-item .icon {
+            font-size: 20px;
+            width: 32px;
+            text-align: center;
+        }
+
+        .plan-item .info {
+            flex: 1;
+        }
+
+        .plan-item .label {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text);
+        }
+
+        .plan-item .count {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .plan-item .status {
+            font-size: 18px;
+            transition: all 0.3s ease;
+        }
+
+        .plan-item.done {
+            border-color: rgba(107, 203, 119, 0.3);
+            background: rgba(107, 203, 119, 0.08);
+        }
+
+        .plan-item.done .status {
+            color: #6BCB77;
+        }
+
+        .plan-item.pending .status {
+            color: var(--text-secondary);
+        }
+
+        .plan-item .input-count {
+            width: 50px;
+            padding: 4px 6px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 14px;
+            text-align: center;
+            outline: none;
+        }
+
+        .plan-item .input-count:focus {
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .plan-item .input-count::placeholder {
+            color: var(--text-secondary);
+            font-size: 11px;
+        }
+
         /* ============ INPUT GROUPS ============ */
         .input-group {
             margin-bottom: 20px;
@@ -315,7 +414,6 @@
             min-width: 20px;
         }
         
-        /* Прогресс-бар */
         .progress-container {
             margin-top: 10px;
             height: 6px;
@@ -344,7 +442,6 @@
             border-radius: 10px;
         }
         
-        /* Статус под прогресс-баром */
         .range-status {
             display: flex;
             justify-content: space-between;
@@ -633,6 +730,8 @@
             .input-wrapper input { font-size: 18px; padding: 10px 14px; }
             .stat-item .value { font-size: 22px; }
             .stats-grid { gap: 8px; }
+            .plan-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+            .plan-item { padding: 10px 12px; }
         }
     </style>
 </head>
@@ -654,6 +753,95 @@
     
     <!-- ===== TAB: MY DATA ===== -->
     <div id="tabMy">
+        
+        <!-- ============================================================ -->
+        <!-- ===== НОВЫЙ БЛОК: ПЛАН ВЫПОЛНЕНИЯ ===== -->
+        <!-- ============================================================ -->
+        <div class="card">
+            <div class="card-title">
+                🏆 План выполнения
+                <span class="badge-pending" id="planProgress">0/8</span>
+            </div>
+            
+            <div class="plan-grid" id="planGrid">
+                <!-- Массаж -->
+                <div class="plan-item pending" data-id="massage" onclick="togglePlan(this)">
+                    <span class="icon">💆</span>
+                    <div class="info">
+                        <div class="label">Массаж</div>
+                    </div>
+                    <span class="status">◻️</span>
+                </div>
+                
+                <!-- Баня -->
+                <div class="plan-item pending" data-id="banya" onclick="togglePlan(this)">
+                    <span class="icon">🧖</span>
+                    <div class="info">
+                        <div class="label">Баня</div>
+                    </div>
+                    <span class="status">◻️</span>
+                </div>
+                
+                <!-- Бассейн -->
+                <div class="plan-item pending" data-id="pool" onclick="togglePlan(this)">
+                    <span class="icon">🏊</span>
+                    <div class="info">
+                        <div class="label">Бассейн</div>
+                    </div>
+                    <span class="status">◻️</span>
+                </div>
+                
+                <!-- Не ел после 18 -->
+                <div class="plan-item pending" data-id="no_food" onclick="togglePlan(this)">
+                    <span class="icon">⏰</span>
+                    <div class="info">
+                        <div class="label">Не ел после 18</div>
+                    </div>
+                    <span class="status">◻️</span>
+                </div>
+                
+                <!-- Отжимания -->
+                <div class="plan-item pending" data-id="pushups">
+                    <span class="icon">💪</span>
+                    <div class="info">
+                        <div class="label">Отжимания</div>
+                        <input type="number" class="input-count" placeholder="шт" min="0" step="1" value="">
+                    </div>
+                    <span class="status">◻️</span>
+                </div>
+                
+                <!-- Приседания -->
+                <div class="plan-item pending" data-id="squats">
+                    <span class="icon">🦵</span>
+                    <div class="info">
+                        <div class="label">Приседания</div>
+                        <input type="number" class="input-count" placeholder="шт" min="0" step="1" value="">
+                    </div>
+                    <span class="status">◻️</span>
+                </div>
+                
+                <!-- Пресс -->
+                <div class="plan-item pending" data-id="abs">
+                    <span class="icon">🔥</span>
+                    <div class="info">
+                        <div class="label">Пресс</div>
+                        <input type="number" class="input-count" placeholder="шт" min="0" step="1" value="">
+                    </div>
+                    <span class="status">◻️</span>
+                </div>
+                
+                <!-- Зал силовые -->
+                <div class="plan-item pending" data-id="gym">
+                    <span class="icon">🏋️</span>
+                    <div class="info">
+                        <div class="label">Зал (силовые)</div>
+                    </div>
+                    <span class="status">◻️</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ===== БЛОК КБЖУ (было до этого) ===== -->
         <div class="card">
             <div class="card-title">
                 📅 Сегодня
@@ -807,7 +995,126 @@
             fiber_min: 10, fiber_max: 20
         };
         let compareChart = null;
-        
+        let planData = {};
+
+        // ============ ПЛАН ВЫПОЛНЕНИЯ ============
+        function togglePlan(el) {
+            const isDone = el.classList.contains('done');
+            
+            if (isDone) {
+                el.classList.remove('done');
+                el.classList.add('pending');
+                el.querySelector('.status').textContent = '◻️';
+            } else {
+                el.classList.remove('pending');
+                el.classList.add('done');
+                el.querySelector('.status').textContent = '✅';
+            }
+            
+            // Проверяем, есть ли input с числом
+            const input = el.querySelector('.input-count');
+            if (input) {
+                const val = parseInt(input.value);
+                if (val > 0) {
+                    // Если есть число — оставляем
+                }
+            }
+            
+            updatePlanProgress();
+            savePlanData();
+        }
+
+        function updatePlanProgress() {
+            const items = document.querySelectorAll('.plan-item');
+            const done = document.querySelectorAll('.plan-item.done');
+            const total = items.length;
+            const count = done.length;
+            
+            const badge = document.getElementById('planProgress');
+            badge.textContent = `${count}/${total}`;
+            
+            if (count === total) {
+                badge.className = 'badge-done';
+            } else {
+                badge.className = 'badge-pending';
+            }
+        }
+
+        function savePlanData() {
+            const items = document.querySelectorAll('.plan-item');
+            const data = {};
+            
+            items.forEach(el => {
+                const id = el.dataset.id;
+                const isDone = el.classList.contains('done');
+                const input = el.querySelector('.input-count');
+                const count = input ? parseInt(input.value) || 0 : 0;
+                
+                data[id] = {
+                    done: isDone,
+                    count: count
+                };
+            });
+            
+            // Сохраняем в localStorage
+            localStorage.setItem('plan_data_' + userId, JSON.stringify(data));
+            
+            // Отправляем на сервер (опционально)
+            // Можно сохранить вместе с БЖУ
+        }
+
+        function loadPlanData() {
+            const saved = localStorage.getItem('plan_data_' + userId);
+            if (saved) {
+                try {
+                    const data = JSON.parse(saved);
+                    
+                    document.querySelectorAll('.plan-item').forEach(el => {
+                        const id = el.dataset.id;
+                        if (data[id]) {
+                            if (data[id].done) {
+                                el.classList.remove('pending');
+                                el.classList.add('done');
+                                el.querySelector('.status').textContent = '✅';
+                            } else {
+                                el.classList.remove('done');
+                                el.classList.add('pending');
+                                el.querySelector('.status').textContent = '◻️';
+                            }
+                            
+                            const input = el.querySelector('.input-count');
+                            if (input && data[id].count) {
+                                input.value = data[id].count;
+                            }
+                        }
+                    });
+                    
+                    updatePlanProgress();
+                } catch (e) {
+                    console.error('Ошибка загрузки плана:', e);
+                }
+            }
+        }
+
+        // Обработка ввода чисел в плане
+        document.addEventListener('input', function(e) {
+            if (e.target.classList.contains('input-count')) {
+                const el = e.target.closest('.plan-item');
+                const val = parseInt(e.target.value);
+                if (val > 0) {
+                    el.classList.remove('pending');
+                    el.classList.add('done');
+                    el.querySelector('.status').textContent = '✅';
+                } else {
+                    el.classList.remove('done');
+                    el.classList.add('pending');
+                    el.querySelector('.status').textContent = '◻️';
+                }
+                updatePlanProgress();
+                savePlanData();
+            }
+        });
+
         // ============ TELEGRAM ============
         const tg = window.Telegram?.WebApp;
         if (tg) {
@@ -860,7 +1167,6 @@
                     fiber: record.fiber || 0
                 };
                 
-                // Обновляем лимиты в UI
                 const fields = ['protein', 'fat', 'carbs', 'fiber'];
                 fields.forEach(f => {
                     document.getElementById(`limit${f.charAt(0).toUpperCase() + f.slice(1)}Min`).textContent = limits[`${f}_min`];
@@ -872,6 +1178,9 @@
                 
                 updateStats();
                 updateProgressBars();
+                
+                // Загружаем план
+                loadPlanData();
             } catch (error) {
                 showToast('Ошибка загрузки', 'error');
             }
@@ -906,7 +1215,6 @@
                 el.textContent = statusText;
                 el.className = `status ${statusClass}`;
                 
-                // Статус под прогресс-баром
                 const statusBadge = document.getElementById(`${f}StatusText`);
                 const statusLabels = {
                     'good': '✅ Норма',
@@ -1130,7 +1438,7 @@
         }
         
         // ============ AUTO-SAVE ============
-        document.querySelectorAll('#tabMy input').forEach(input => {
+        document.querySelectorAll('#tabMy .input-group input').forEach(input => {
             input.addEventListener('change', () => {
                 userData[input.id] = parseFloat(input.value) || 0;
                 updateStats();
