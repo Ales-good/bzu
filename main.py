@@ -233,6 +233,58 @@ async def set_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
             scope=BotCommandScopeChat(chat_id=update.effective_chat.id)
         )
 
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Кнопка с WebApp для группы"""
+    keyboard = [[
+        InlineKeyboardButton(
+            "📊 Открыть дневник БЖУ",
+            web_app=WebAppInfo(url=WEBAPP_URL)
+        )
+    ]]
+    
+    await update.message.reply_text(
+        "👋 Привет! Я бот для учета БЖУ в этой группе.\n\n"
+        "📝 Нажми на кнопку ниже, чтобы открыть дневник.\n"
+        "Там ты сможешь:\n"
+        "✅ Вводить свои показатели\n"
+        "📈 Смотреть график сравнения с участниками\n"
+        "🎯 Отслеживать выполнение нормы\n"
+        "🏆 Отмечать план выполнения (массаж, баня, спорт и т.д.)",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Сводка в чат"""
+    records = get_today_records()
+    
+    if not records or all(r['protein'] == 0 and r['fat'] == 0 and r['carbs'] == 0 and r['fiber'] == 0 for r in records):
+        await update.message.reply_text("📭 Сегодня никто не ввел данные. Нажми 'Открыть дневник БЖУ'!")
+        return
+    
+    message = "📊 <b>Сводка за сегодня</b>\n\n"
+    
+    for rec in records:
+        name = rec['first_name'] or rec['username'] or f"User {rec['user_id']}"
+        total = rec['protein'] + rec['fat'] + rec['carbs'] + rec['fiber']
+        if total == 0:
+            continue
+        
+        status_emoji = {
+            'good': '✅',
+            'under': '⬇️',
+            'over': '⬆️',
+            'empty': '⚪'
+        }
+        
+        message += f"👤 <b>{name}</b>\n"
+        message += f"  🍗 Белки: {rec['protein']:.0f}г ({rec['protein_min']:.0f}-{rec['protein_max']:.0f}) {status_emoji.get(rec['protein_status'], '')}\n"
+        message += f"  🧈 Жиры: {rec['fat']:.0f}г ({rec['fat_min']:.0f}-{rec['fat_max']:.0f}) {status_emoji.get(rec['fat_status'], '')}\n"
+        message += f"  🍞 Углеводы: {rec['carbs']:.0f}г ({rec['carbs_min']:.0f}-{rec['carbs_max']:.0f}) {status_emoji.get(rec['carbs_status'], '')}\n"
+        message += f"  🥦 Клетчатка: {rec['fiber']:.0f}г ({rec['fiber_min']:.0f}-{rec['fiber_max']:.0f}) {status_emoji.get(rec['fiber_status'], '')}\n\n"
+    
+    await update.message.reply_text(message, parse_mode='HTML')
+    
+
 def run_bot():
     bot_app = Application.builder().token(TELEGRAM_TOKEN).build()
     
