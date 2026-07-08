@@ -29,7 +29,6 @@
             --fiber: #4D96FF;
             
             --gradient-main: linear-gradient(135deg, #FF6B6B, #FFD93D, #6BCB77, #4D96FF);
-            --gradient-card: linear-gradient(135deg, rgba(255, 107, 107, 0.1), rgba(77, 150, 255, 0.1));
         }
         
         body {
@@ -328,7 +327,128 @@
             color: var(--text-secondary);
             font-size: 11px;
         }
-
+        
+        /* ============ СТАТИСТИКА ПЛАНА ============ */
+        .plan-stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        
+        .plan-stat-item {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            padding: 10px 8px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .plan-stat-item .num {
+            font-size: 20px;
+            font-weight: 700;
+        }
+        
+        .plan-stat-item .num.green { color: #6BCB77; }
+        .plan-stat-item .num.yellow { color: #FFD93D; }
+        .plan-stat-item .num.red { color: #FF6B6B; }
+        
+        .plan-stat-item .lbl {
+            font-size: 10px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+        
+        .period-filter {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        
+        .period-btn {
+            flex: 1;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 10px;
+            color: var(--text-secondary);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+        
+        .period-btn.active {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.15);
+            color: white;
+        }
+        
+        .period-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .plan-history {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .plan-history::-webkit-scrollbar {
+            width: 3px;
+        }
+        
+        .plan-history::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+        
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        }
+        
+        .history-item:last-child {
+            border-bottom: none;
+        }
+        
+        .history-item .h-date {
+            font-size: 12px;
+            color: var(--text-secondary);
+            min-width: 60px;
+        }
+        
+        .history-item .h-details {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+        
+        .history-item .h-detail {
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 3px;
+        }
+        
+        .history-item .h-detail.done { color: #6BCB77; }
+        .history-item .h-detail.pending { color: var(--text-secondary); }
+        
+        .history-item .h-total {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text);
+            min-width: 30px;
+            text-align: right;
+        }
+        
+        .history-item .h-total.good { color: #6BCB77; }
+        .history-item .h-total.bad { color: #FF6B6B; }
+        
         /* ============ INPUT GROUPS ============ */
         .input-group {
             margin-bottom: 20px;
@@ -609,15 +729,16 @@
         .badge.over { background: rgba(255, 107, 107, 0.15); color: #FF6B6B; }
         .badge.empty { background: rgba(255, 255, 255, 0.05); color: var(--text-secondary); }
         
-        .status-emoji {
-            font-size: 14px;
-        }
-        
         /* ============ CHART ============ */
         .chart-container {
-            height: 250px;
+            height: 220px;
             margin-top: 12px;
             position: relative;
+        }
+        
+        .chart-container-small {
+            height: 160px;
+            margin-top: 8px;
         }
         
         /* ============ LOADING ============ */
@@ -732,6 +853,11 @@
             .stats-grid { gap: 8px; }
             .plan-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
             .plan-item { padding: 10px 12px; }
+            .plan-stats-grid { grid-template-columns: 1fr 1fr 1fr 1fr; gap: 4px; }
+            .plan-stat-item { padding: 8px 4px; }
+            .plan-stat-item .num { font-size: 16px; }
+            .period-filter { gap: 4px; }
+            .period-btn { font-size: 10px; padding: 6px; }
         }
     </style>
 </head>
@@ -754,9 +880,7 @@
     <!-- ===== TAB: MY DATA ===== -->
     <div id="tabMy">
         
-        <!-- ============================================================ -->
-        <!-- ===== НОВЫЙ БЛОК: ПЛАН ВЫПОЛНЕНИЯ ===== -->
-        <!-- ============================================================ -->
+        <!-- БЛОК: ПЛАН ВЫПОЛНЕНИЯ -->
         <div class="card">
             <div class="card-title">
                 🏆 План выполнения
@@ -764,7 +888,6 @@
             </div>
             
             <div class="plan-grid" id="planGrid">
-                <!-- Массаж -->
                 <div class="plan-item pending" data-id="massage" onclick="togglePlan(this)">
                     <span class="icon">💆</span>
                     <div class="info">
@@ -773,7 +896,6 @@
                     <span class="status">◻️</span>
                 </div>
                 
-                <!-- Баня -->
                 <div class="plan-item pending" data-id="banya" onclick="togglePlan(this)">
                     <span class="icon">🧖</span>
                     <div class="info">
@@ -782,7 +904,6 @@
                     <span class="status">◻️</span>
                 </div>
                 
-                <!-- Бассейн -->
                 <div class="plan-item pending" data-id="pool" onclick="togglePlan(this)">
                     <span class="icon">🏊</span>
                     <div class="info">
@@ -791,7 +912,6 @@
                     <span class="status">◻️</span>
                 </div>
                 
-                <!-- Не ел после 18 -->
                 <div class="plan-item pending" data-id="no_food" onclick="togglePlan(this)">
                     <span class="icon">⏰</span>
                     <div class="info">
@@ -800,7 +920,6 @@
                     <span class="status">◻️</span>
                 </div>
                 
-                <!-- Отжимания -->
                 <div class="plan-item pending" data-id="pushups">
                     <span class="icon">💪</span>
                     <div class="info">
@@ -810,7 +929,6 @@
                     <span class="status">◻️</span>
                 </div>
                 
-                <!-- Приседания -->
                 <div class="plan-item pending" data-id="squats">
                     <span class="icon">🦵</span>
                     <div class="info">
@@ -820,7 +938,6 @@
                     <span class="status">◻️</span>
                 </div>
                 
-                <!-- Пресс -->
                 <div class="plan-item pending" data-id="abs">
                     <span class="icon">🔥</span>
                     <div class="info">
@@ -830,8 +947,7 @@
                     <span class="status">◻️</span>
                 </div>
                 
-                <!-- Зал силовые -->
-                <div class="plan-item pending" data-id="gym">
+                <div class="plan-item pending" data-id="gym" onclick="togglePlan(this)">
                     <span class="icon">🏋️</span>
                     <div class="info">
                         <div class="label">Зал (силовые)</div>
@@ -841,14 +957,13 @@
             </div>
         </div>
         
-        <!-- ===== БЛОК КБЖУ (было до этого) ===== -->
+        <!-- БЛОК КБЖУ -->
         <div class="card">
             <div class="card-title">
                 📅 Сегодня
                 <span class="date" id="currentDate"></span>
             </div>
             
-            <!-- Белки -->
             <div class="input-group">
                 <label>
                     <span><span class="emoji">🍗</span> Белки</span>
@@ -868,7 +983,6 @@
                 </div>
             </div>
             
-            <!-- Жиры -->
             <div class="input-group">
                 <label>
                     <span><span class="emoji">🧈</span> Жиры</span>
@@ -888,7 +1002,6 @@
                 </div>
             </div>
             
-            <!-- Углеводы -->
             <div class="input-group">
                 <label>
                     <span><span class="emoji">🍞</span> Углеводы</span>
@@ -908,7 +1021,6 @@
                 </div>
             </div>
             
-            <!-- Клетчатка -->
             <div class="input-group">
                 <label>
                     <span><span class="emoji">🥦</span> Клетчатка</span>
@@ -932,7 +1044,7 @@
             <button class="btn-secondary" onclick="resetToday()">🔄 Сбросить</button>
         </div>
         
-        <!-- ===== STATS ===== -->
+        <!-- STATS -->
         <div class="card">
             <div class="card-title">📊 Итог</div>
             <div class="stats-grid">
@@ -962,8 +1074,62 @@
     
     <!-- ===== TAB: COMPARE ===== -->
     <div id="tabCompare" class="hidden">
+        
+        <!-- ===== СТАТИСТИКА ПЛАНА ===== -->
         <div class="card">
-            <div class="card-title">👥 Участники</div>
+            <div class="card-title">
+                📊 Статистика плана
+                <span class="date" id="planPeriodLabel">за сегодня</span>
+            </div>
+            
+            <!-- Фильтр периодов -->
+            <div class="period-filter">
+                <button class="period-btn active" data-period="day" onclick="setPeriod('day')">День</button>
+                <button class="period-btn" data-period="week" onclick="setPeriod('week')">Неделя</button>
+                <button class="period-btn" data-period="month" onclick="setPeriod('month')">Месяц</button>
+                <button class="period-btn" data-period="all" onclick="setPeriod('all')">Всё</button>
+            </div>
+            
+            <!-- Статистика -->
+            <div class="plan-stats-grid">
+                <div class="plan-stat-item">
+                    <div class="num green" id="planTotalDone">0</div>
+                    <div class="lbl">✅ Выполнено</div>
+                </div>
+                <div class="plan-stat-item">
+                    <div class="num yellow" id="planTotalItems">0</div>
+                    <div class="lbl">📋 Всего пунктов</div>
+                </div>
+                <div class="plan-stat-item">
+                    <div class="num" id="planPercent" style="color:#4D96FF;">0%</div>
+                    <div class="lbl">🎯 Процент</div>
+                </div>
+                <div class="plan-stat-item">
+                    <div class="num red" id="planStreak">0</div>
+                    <div class="lbl">🔥 Дней подряд</div>
+                </div>
+            </div>
+            
+            <!-- График выполнения по дням -->
+            <div class="chart-container-small">
+                <canvas id="planChart"></canvas>
+            </div>
+        </div>
+        
+        <!-- История выполнения -->
+        <div class="card">
+            <div class="card-title">📜 История</div>
+            <div class="plan-history" id="planHistory">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p style="margin-top:12px;">Загрузка...</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- БЖУ сравнение -->
+        <div class="card">
+            <div class="card-title">👥 Участники (БЖУ)</div>
             <div id="comparisonContainer">
                 <div class="loading">
                     <div class="spinner"></div>
@@ -973,7 +1139,7 @@
         </div>
         
         <div class="card">
-            <div class="card-title">📈 Сравнение</div>
+            <div class="card-title">📈 Сравнение БЖУ</div>
             <div class="chart-container">
                 <canvas id="compareChart"></canvas>
             </div>
@@ -995,9 +1161,22 @@
             fiber_min: 10, fiber_max: 20
         };
         let compareChart = null;
-        let planData = {};
-
+        let planChart = null;
+        let currentPeriod = 'day';
+        let allPlanHistory = [];
+        
         // ============ ПЛАН ВЫПОЛНЕНИЯ ============
+        const PLAN_ITEMS = [
+            { id: 'massage', icon: '💆', label: 'Массаж' },
+            { id: 'banya', icon: '🧖', label: 'Баня' },
+            { id: 'pool', icon: '🏊', label: 'Бассейн' },
+            { id: 'no_food', icon: '⏰', label: 'Не ел после 18' },
+            { id: 'pushups', icon: '💪', label: 'Отжимания' },
+            { id: 'squats', icon: '🦵', label: 'Приседания' },
+            { id: 'abs', icon: '🔥', label: 'Пресс' },
+            { id: 'gym', icon: '🏋️', label: 'Зал (силовые)' }
+        ];
+        
         function togglePlan(el) {
             const isDone = el.classList.contains('done');
             
@@ -1011,12 +1190,11 @@
                 el.querySelector('.status').textContent = '✅';
             }
             
-            // Проверяем, есть ли input с числом
             const input = el.querySelector('.input-count');
             if (input) {
                 const val = parseInt(input.value);
                 if (val > 0) {
-                    // Если есть число — оставляем
+                    // сохраняем
                 }
             }
             
@@ -1040,7 +1218,7 @@
             }
         }
 
-        function savePlanData() {
+        function getPlanData() {
             const items = document.querySelectorAll('.plan-item');
             const data = {};
             
@@ -1056,11 +1234,15 @@
                 };
             });
             
-            // Сохраняем в localStorage
+            return data;
+        }
+
+        function savePlanData() {
+            const data = getPlanData();
             localStorage.setItem('plan_data_' + userId, JSON.stringify(data));
             
-            // Отправляем на сервер (опционально)
-            // Можно сохранить вместе с БЖУ
+            // Сохраняем в историю (ежедневно)
+            savePlanHistory(data);
         }
 
         function loadPlanData() {
@@ -1096,24 +1278,290 @@
             }
         }
 
-        // Обработка ввода чисел в плане
-        document.addEventListener('input', function(e) {
-            if (e.target.classList.contains('input-count')) {
-                const el = e.target.closest('.plan-item');
-                const val = parseInt(e.target.value);
-                if (val > 0) {
-                    el.classList.remove('pending');
-                    el.classList.add('done');
-                    el.querySelector('.status').textContent = '✅';
-                } else {
-                    el.classList.remove('done');
-                    el.classList.add('pending');
-                    el.querySelector('.status').textContent = '◻️';
-                }
-                updatePlanProgress();
-                savePlanData();
+        // ============ ИСТОРИЯ ПЛАНА ============
+        function savePlanHistory(data) {
+            const today = new Date().toISOString().split('T')[0];
+            let history = JSON.parse(localStorage.getItem('plan_history_' + userId) || '[]');
+            
+            // Ищем запись за сегодня
+            const existing = history.findIndex(h => h.date === today);
+            const doneCount = Object.values(data).filter(v => v.done || v.count > 0).length;
+            const totalItems = PLAN_ITEMS.length;
+            
+            const entry = {
+                date: today,
+                done: doneCount,
+                total: totalItems,
+                items: data
+            };
+            
+            if (existing >= 0) {
+                history[existing] = entry;
+            } else {
+                history.push(entry);
             }
-        });
+            
+            // Сортируем по дате
+            history.sort((a, b) => a.date.localeCompare(b.date));
+            
+            // Оставляем только последние 90 дней
+            if (history.length > 90) {
+                history = history.slice(-90);
+            }
+            
+            localStorage.setItem('plan_history_' + userId, JSON.stringify(history));
+            allPlanHistory = history;
+        }
+
+        function loadPlanHistory() {
+            const history = localStorage.getItem('plan_history_' + userId);
+            if (history) {
+                try {
+                    allPlanHistory = JSON.parse(history);
+                } catch (e) {
+                    allPlanHistory = [];
+                }
+            } else {
+                allPlanHistory = [];
+            }
+            
+            // Если сегодня нет записи — добавляем текущие данные
+            const today = new Date().toISOString().split('T')[0];
+            const existing = allPlanHistory.find(h => h.date === today);
+            if (!existing) {
+                const data = getPlanData();
+                const doneCount = Object.values(data).filter(v => v.done || v.count > 0).length;
+                allPlanHistory.push({
+                    date: today,
+                    done: doneCount,
+                    total: PLAN_ITEMS.length,
+                    items: data
+                });
+                localStorage.setItem('plan_history_' + userId, JSON.stringify(allPlanHistory));
+            }
+        }
+
+        // ============ СТАТИСТИКА ПЛАНА В СРАВНЕНИИ ============
+        function getFilteredHistory(period) {
+            const today = new Date();
+            let cutoff = new Date(today);
+            
+            switch(period) {
+                case 'day':
+                    cutoff.setDate(cutoff.getDate() - 1);
+                    break;
+                case 'week':
+                    cutoff.setDate(cutoff.getDate() - 7);
+                    break;
+                case 'month':
+                    cutoff.setMonth(cutoff.getMonth() - 1);
+                    break;
+                case 'all':
+                default:
+                    cutoff = new Date(2000, 0, 1);
+                    break;
+            }
+            
+            const cutoffStr = cutoff.toISOString().split('T')[0];
+            return allPlanHistory.filter(h => h.date >= cutoffStr);
+        }
+
+        function updatePlanStats(period) {
+            const filtered = getFilteredHistory(period);
+            
+            if (filtered.length === 0) {
+                document.getElementById('planTotalDone').textContent = '0';
+                document.getElementById('planTotalItems').textContent = '0';
+                document.getElementById('planPercent').textContent = '0%';
+                document.getElementById('planStreak').textContent = '0';
+                document.getElementById('planHistory').innerHTML = 
+                    '<p style="text-align:center;color:var(--text-secondary);padding:20px;">📭 Нет данных за этот период</p>';
+                return;
+            }
+            
+            // Общая статистика
+            let totalDone = 0;
+            let totalItems = 0;
+            
+            filtered.forEach(h => {
+                totalDone += h.done || 0;
+                totalItems += h.total || PLAN_ITEMS.length;
+            });
+            
+            const avgDone = totalDone / filtered.length;
+            const avgTotal = totalItems / filtered.length;
+            const percent = avgTotal > 0 ? Math.round((avgDone / avgTotal) * 100) : 0;
+            
+            document.getElementById('planTotalDone').textContent = Math.round(avgDone);
+            document.getElementById('planTotalItems').textContent = Math.round(avgTotal);
+            document.getElementById('planPercent').textContent = percent + '%';
+            
+            // Streak (серия дней подряд)
+            let streak = 0;
+            const sorted = [...allPlanHistory].sort((a, b) => b.date.localeCompare(a.date));
+            const today = new Date().toISOString().split('T')[0];
+            
+            for (let h of sorted) {
+                const done = h.done || 0;
+                const total = h.total || PLAN_ITEMS.length;
+                if (done >= total) {
+                    streak++;
+                } else {
+                    break;
+                }
+            }
+            
+            document.getElementById('planStreak').textContent = streak;
+            
+            // Метка периода
+            const labels = {
+                'day': 'за сегодня',
+                'week': 'за неделю',
+                'month': 'за месяц',
+                'all': 'за всё время'
+            };
+            document.getElementById('planPeriodLabel').textContent = labels[period] || 'за сегодня';
+            
+            // История
+            renderPlanHistory(filtered);
+            
+            // График
+            renderPlanChart(filtered);
+        }
+
+        function renderPlanHistory(filtered) {
+            const container = document.getElementById('planHistory');
+            
+            if (filtered.length === 0) {
+                container.innerHTML = '<p style="text-align:center;color:var(--text-secondary);padding:20px;">📭 Нет данных</p>';
+                return;
+            }
+            
+            // Показываем последние 14 дней
+            const show = filtered.slice(-14).reverse();
+            
+            let html = '';
+            show.forEach(h => {
+                const date = new Date(h.date + 'T00:00:00');
+                const dateStr = date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+                const done = h.done || 0;
+                const total = h.total || PLAN_ITEMS.length;
+                const isFull = done >= total;
+                
+                html += `
+                    <div class="history-item">
+                        <span class="h-date">${dateStr}</span>
+                        <div class="h-details">
+                            ${Object.entries(h.items || {}).map(([id, val]) => {
+                                const item = PLAN_ITEMS.find(i => i.id === id);
+                                if (!item) return '';
+                                const isDone = val.done || val.count > 0;
+                                return `<span class="h-detail ${isDone ? 'done' : 'pending'}">${isDone ? '✅' : '◻️'} ${item.icon}</span>`;
+                            }).join('')}
+                        </div>
+                        <span class="h-total ${isFull ? 'good' : 'bad'}">${done}/${total}</span>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        function renderPlanChart(filtered) {
+            const ctx = document.getElementById('planChart').getContext('2d');
+            if (planChart) planChart.destroy();
+            
+            if (filtered.length === 0) {
+                planChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: { 
+                        labels: ['Нет данных'], 
+                        datasets: [{ label: 'Выполнено', data: [0], backgroundColor: 'rgba(255,255,255,0.05)' }] 
+                    },
+                    options: { 
+                        responsive: true, 
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(255,255,255,0.4)' } },
+                            x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.4)' } }
+                        }
+                    }
+                });
+                return;
+            }
+            
+            const labels = filtered.map(h => {
+                const d = new Date(h.date + 'T00:00:00');
+                return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+            });
+            
+            const doneData = filtered.map(h => h.done || 0);
+            const totalData = filtered.map(h => h.total || PLAN_ITEMS.length);
+            
+            planChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: '✅ Выполнено',
+                            data: doneData,
+                            backgroundColor: 'rgba(107, 203, 119, 0.6)',
+                            borderColor: '#6BCB77',
+                            borderWidth: 1,
+                            borderRadius: 4,
+                            barPercentage: 0.6
+                        },
+                        {
+                            label: '📋 Всего',
+                            data: totalData,
+                            backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                            borderColor: 'rgba(255, 255, 255, 0.2)',
+                            borderWidth: 1,
+                            borderRadius: 4,
+                            barPercentage: 0.6
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'bottom',
+                            labels: { 
+                                usePointStyle: true, 
+                                padding: 12, 
+                                color: 'rgba(255,255,255,0.6)',
+                                font: { size: 10 }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { 
+                            beginAtZero: true, 
+                            grid: { color: 'rgba(255,255,255,0.05)' }, 
+                            ticks: { color: 'rgba(255,255,255,0.4)', stepSize: 1 } 
+                        },
+                        x: { 
+                            grid: { display: false }, 
+                            ticks: { color: 'rgba(255,255,255,0.4)', font: { size: 10 } } 
+                        }
+                    }
+                }
+            });
+        }
+
+        // ============ ПЕРИОД ============
+        function setPeriod(period) {
+            currentPeriod = period;
+            document.querySelectorAll('.period-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.period === period);
+            });
+            updatePlanStats(period);
+        }
 
         // ============ TELEGRAM ============
         const tg = window.Telegram?.WebApp;
@@ -1179,8 +1627,14 @@
                 updateStats();
                 updateProgressBars();
                 
-                // Загружаем план
                 loadPlanData();
+                loadPlanHistory();
+                updatePlanStats('day');
+                
+                // Загружаем сравнение если на вкладке
+                if (!document.getElementById('tabCompare').classList.contains('hidden')) {
+                    loadComparison();
+                }
             } catch (error) {
                 showToast('Ошибка загрузки', 'error');
             }
@@ -1412,6 +1866,9 @@
                 document.querySelector('.tab:last-child').classList.add('active');
                 document.getElementById('tabCompare').classList.remove('hidden');
                 loadComparison();
+                // Обновляем статистику плана
+                loadPlanHistory();
+                updatePlanStats(currentPeriod);
             }
         }
         
@@ -1445,6 +1902,30 @@
                 updateProgressBars();
             });
         });
+
+        // Обработка ввода чисел в плане
+        document.addEventListener('input', function(e) {
+            if (e.target.classList.contains('input-count')) {
+                const el = e.target.closest('.plan-item');
+                const val = parseInt(e.target.value);
+                if (val > 0) {
+                    el.classList.remove('pending');
+                    el.classList.add('done');
+                    el.querySelector('.status').textContent = '✅';
+                } else {
+                    el.classList.remove('done');
+                    el.classList.add('pending');
+                    el.querySelector('.status').textContent = '◻️';
+                }
+                updatePlanProgress();
+                savePlanData();
+                // Обновляем статистику если на вкладке сравнения
+                if (!document.getElementById('tabCompare').classList.contains('hidden')) {
+                    loadPlanHistory();
+                    updatePlanStats(currentPeriod);
+                }
+            }
+        });
         
         // ============ INIT ============
         loadUserData();
@@ -1452,6 +1933,8 @@
         setInterval(() => {
             if (!document.getElementById('tabCompare').classList.contains('hidden')) {
                 loadComparison();
+                loadPlanHistory();
+                updatePlanStats(currentPeriod);
             }
         }, 30000);
     </script>
