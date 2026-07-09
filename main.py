@@ -266,18 +266,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     print(f"📩 /start от {user.first_name} (ID: {user.id}) в чате: {chat.type if chat else 'unknown'}")
     
-    # Кнопка для открытия дневника (работает везде)
-    keyboard = [[
-        InlineKeyboardButton(
-            "📊 Открыть дневник",
-            web_app=WebAppInfo(url=WEBAPP_URL)
-        )
-    ]]
-    
+    # ОТПРАВЛЯЕМ ССЫЛКУ ВМЕСТО КНОПКИ
     if chat and chat.type in ['group', 'supergroup']:
         text = (
             "👋 Привет! Я бот для учета БЖУ в этой группе.\n\n"
-            "📝 Нажми на кнопку ниже, чтобы открыть дневник.\n"
+            "📝 Открой дневник по ссылке:\n"
+            f"<a href=\"{WEBAPP_URL}\">📊 Открыть дневник БЖУ</a>\n\n"
             "Там ты сможешь:\n"
             "✅ Вводить свои показатели (БЖУ + калории)\n"
             "📈 Смотреть графики динамики\n"
@@ -290,8 +284,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         text = (
             "👋 Привет! Я бот для учета БЖУ.\n\n"
-            "📝 Нажми на кнопку ниже, чтобы открыть дневник.\n"
-            "Также можешь нажать кнопку <b>Menu</b> внизу экрана.\n\n"
+            "📝 Открой дневник по ссылке:\n"
+            f"<a href=\"{WEBAPP_URL}\">📊 Открыть дневник БЖУ</a>\n\n"
+            "Или нажми на кнопку <b>Menu</b> внизу экрана.\n"
             "Добавь меня в группу, чтобы сравнивать результаты!\n\n"
             "💡 Команды:\n"
             "/start - Главное меню\n"
@@ -301,8 +296,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(
         text,
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode='HTML'
+        parse_mode='HTML',
+        disable_web_page_preview=False
     )
 
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -339,7 +334,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/start - Главное меню\n"
         "/stats - Статистика за сегодня\n"
         "/help - Помощь\n\n"
-        "📝 Нажми на кнопку «Открыть дневник» или кнопку <b>Menu</b> внизу экрана.",
+        "📝 Открой дневник по ссылке:\n"
+        f"<a href=\"{WEBAPP_URL}\">📊 Открыть дневник БЖУ</a>",
         parse_mode='HTML'
     )
 
