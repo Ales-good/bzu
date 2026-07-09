@@ -80,7 +80,19 @@ def init_db():
             UNIQUE KEY (user_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ''')
-    
+
+    # ===== НОВАЯ ТАБЛИЦА ДЛЯ ПЛАНА =====
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS plan_records (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id BIGINT,
+            record_date DATE,
+            plan_data JSON,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(user_id),
+            UNIQUE KEY (user_id, record_date)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     conn.commit()
     
     # Проверяем
