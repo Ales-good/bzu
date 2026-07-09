@@ -806,7 +806,7 @@
 
     <button class="tg-button" onclick="closeApp()">✖️ Закрыть</button>
 
-    <script>
+        <script>
         const API_URL = window.location.origin;
         let userId = null;
         let userName = 'Гость';
@@ -822,6 +822,7 @@
         let historyPlanChart = null;
         let currentDays = 7;
         let historyData = null;
+        let saveTimeoutId = null;
 
         // ============ TELEGRAM ============
         const tg = window.Telegram?.WebApp;
@@ -834,7 +835,17 @@
                 userName = user.first_name || 'Гость';
                 document.getElementById('userName').textContent = userName;
                 document.getElementById('userAvatar').textContent = userName[0].toUpperCase();
-                console.log('👤 Пользователь:', userId, userName);
+                console.log('👤 Пользователь из Telegram:', userId, userName);
+            }
+        } else {
+            // Тестовый режим - загружаем из localStorage
+            const savedUserId = localStorage.getItem('bzu_user_id');
+            if (savedUserId) {
+                userId = parseInt(savedUserId);
+                userName = localStorage.getItem('bzu_user_name') || 'Тест';
+                document.getElementById('userName').textContent = userName;
+                document.getElementById('userAvatar').textContent = userName[0].toUpperCase();
+                console.log('👤 Загружен пользователь из localStorage:', userId, userName);
             }
         }
 
@@ -1001,7 +1012,6 @@
             if (historyCaloriesChart) historyCaloriesChart.destroy();
             
             if (!data || !data.dates || data.dates.length === 0) {
-                // Показываем пустой график
                 historyCaloriesChart = new Chart(ctx1, {
                     type: 'line',
                     data: {
@@ -1254,14 +1264,16 @@
         // ============ БЖУ ============
         async function loadUserData() {
             if (!userId) {
+                // Если нет userId, создаем новый
                 userId = Date.now();
                 userName = 'Тест';
+                localStorage.setItem('bzu_user_id', userId);
+                localStorage.setItem('bzu_user_name', userName);
                 document.getElementById('userName').textContent = userName;
                 document.getElementById('userAvatar').textContent = 'Т';
-                console.log('👤 Тестовый пользователь:', userId);
-                return;
+                console.log('👤 Создан новый тестовый пользователь:', userId);
             }
-        
+
             try {
                 console.log('📥 Загружаем данные пользователя:', userId);
                 
@@ -1269,11 +1281,13 @@
                 const data = await apiCall(url);
                 if (!data) {
                     console.error('❌ Не удалось загрузить пользователя');
+                    setTimeout(() => loadUserData(), 2000);
                     return;
                 }
-        
+
                 console.log('✅ Данные пользователя загружены');
                 limits = data.limits;
+                
                 const record = data.today_record || {};
                 userData = {
                     protein: record.protein || 0,
@@ -1282,26 +1296,41 @@
                     fiber: record.fiber || 0,
                     calories: record.calories || 0
                 };
-        
+                
+                console.log('📊 Загружены данные за сегодня:', userData);
+
                 const fields = ['protein', 'fat', 'carbs', 'fiber', 'calories'];
                 fields.forEach(f => {
-                    document.getElementById(f).value = userData[f] || 0;
-                    document.getElementById(`limit${f.charAt(0).toUpperCase() + f.slice(1)}Min`).textContent = limits[`${f}_min`] || 0;
-                    document.getElementById(`limit${f.charAt(0).toUpperCase() + f.slice(1)}Max`).textContent = limits[`${f}_max`] || 0;
-                    document.getElementById(`${f}MinLabel`).textContent = limits[`${f}_min`] || 0;
-                    document.getElementById(`${f}MaxLabel`).textContent = limits[`${f}_max`] || 0;
+                    const input = document.getElementById(f);
+                    if (input) {
+                        input.value = userData[f] || 0;
+                    }
+                    
+                    const minEl = document.getElementById(`limit${f.charAt(0).toUpperCase() + f.slice(1)}Min`);
+                    const maxEl = document.getElementById(`limit${f.charAt(0).toUpperCase() + f.slice(1)}Max`);
+                    const minLabel = document.getElementById(`${f}MinLabel`);
+                    const maxLabel = document.getElementById(`${f}MaxLabel`);
+                    
+                    if (minEl) minEl.textContent = limits[`${f}_min`] || 0;
+                    if (maxEl) maxEl.textContent = limits[`${f}_max`] || 0;
+                    if (minLabel) minLabel.textContent = limits[`${f}_min`] || 0;
+                    if (maxLabel) maxLabel.textContent = limits[`${f}_max`] || 0;
                 });
-        
+
                 updateStats();
                 updateProgressBars();
                 await loadPlanFromServer();
-        
+
                 if (!document.getElementById('tabCompare').classList.contains('hidden')) {
                     loadHistory(currentDays);
                     loadComparison();
                 }
+                
+                showToast('📂 Данные загружены', 'success');
+                
             } catch (error) {
                 console.error('❌ Ошибка загрузки:', error);
+                showToast('❌ Ошибка загрузки данных', 'error');
             }
         }
 
@@ -1379,6 +1408,12 @@
                 return;
             }
             
+            // Сохраняем в localStorage для тестового режима
+            if (!tg) {
+                localStorage.setItem('bzu_user_id', userId);
+                localStorage.setItem('bzu_user_name', userName);
+            }
+            
             const data = {
                 user_id: userId,
                 user_name: userName,
@@ -1398,7 +1433,6 @@
                 });
 
                 if (result && result.status === 'success') {
-                    // Обновляем userData после сохранения
                     userData.protein = data.protein;
                     userData.fat = data.fat;
                     userData.carbs = data.carbs;
@@ -1445,7 +1479,7 @@
 
                 const container = document.getElementById('comparisonContainer');
                 
-                // ФИЛЬТРУЕМ - показываем только пользователей с активностью (хоть что-то > 0)
+                // Показываем только активных пользователей
                 const activeUsers = data.filter(rec => {
                     const total = rec.protein + rec.fat + rec.carbs + rec.fiber + rec.calories;
                     return total > 0;
@@ -1462,7 +1496,6 @@
 
                 activeUsers.forEach(rec => {
                     const name = rec.first_name || rec.username || `User ${rec.user_id}`;
-                    const total = rec.protein + rec.fat + rec.carbs + rec.fiber + rec.calories;
                     
                     const getBadge = (status) => {
                         const map = {
@@ -1534,21 +1567,30 @@
 
         // ============ AUTO-SAVE ============
         document.querySelectorAll('#tabMy .input-group input').forEach(input => {
-            input.addEventListener('change', function() {
+            input.addEventListener('input', function() {
+                // Обновляем userData
                 userData[this.id] = parseFloat(this.value) || 0;
                 updateStats();
                 updateProgressBars();
+                
+                // Авто-сохранение через 2 секунды после последнего изменения
+                clearTimeout(saveTimeoutId);
+                saveTimeoutId = setTimeout(() => {
+                    saveData();
+                }, 2000);
             });
         });
 
         // ============ INIT ============
         loadUserData();
+        
+        // Обновляем данные каждые 30 секунд
         setInterval(() => {
             if (!document.getElementById('tabCompare').classList.contains('hidden')) {
                 loadHistory(currentDays);
                 loadComparison();
             }
-        }, 60000);
+        }, 30000);
     </script>
 </body>
 </html>
