@@ -10,6 +10,7 @@ import threading
 from datetime import date
 import os
 import asyncio
+import time
 
 from database_mysql import (
     init_db, get_or_create_user, save_bzu_record, 
@@ -160,7 +161,6 @@ async def update_limits_endpoint(data: LimitsData):
 # ============ API ДЛЯ ПЛАНА ============
 @app.post("/api/plan/save")
 async def save_plan(data: PlanData):
-    """Сохраняет план выполнения"""
     try:
         save_plan_record(data.user_id, data.plan_data, data.record_date)
         return {"status": "success", "message": "План сохранен"}
@@ -169,13 +169,11 @@ async def save_plan(data: PlanData):
 
 @app.get("/api/plan/get/{user_id}")
 async def get_plan(user_id: int, record_date: Optional[str] = None):
-    """Получает план на дату"""
     plan = get_plan_record(user_id, record_date)
     return {"plan": plan or {}}
 
 @app.get("/api/plan/history/{user_id}")
 async def get_plan_history_api(user_id: int, days: int = 30):
-    """Получает историю плана"""
     history = get_plan_history(user_id, days)
     return {"history": history}
 
@@ -184,8 +182,6 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppI
 from telegram.ext import Application, CommandHandler, ContextTypes
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обрабатывает /start и в личке, и в группе"""
-    
     if not update.message:
         return
     
@@ -261,51 +257,44 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(message, parse_mode='HTML')
 
-def run_bot():
-    """Запускает Telegram бота с обработкой ошибок"""
-    try:
-        print(f"🤖 Запуск бота с токеном: {TELEGRAM_TOKEN[:10]}...")
-        
-        # Создаём новый event loop для этого потока
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        
-        # Создаём приложение
-        bot_app = Application.builder().token(TELEGRAM_TOKEN).build()
-        
-        # Добавляем обработчики команд
-        bot_app.add_handler(CommandHandler("start", start))
-        bot_app.add_handler(CommandHandler("help", help_command))
-        bot_app.add_handler(CommandHandler("stats", stats_command))
-        
-        print("✅ Обработчики команд добавлены")
-        print("🤖 Бот запущен и ожидает сообщения...")
-        
-        # Запускаем polling
-        bot_app.run_polling(allowed_updates=["message", "callback_query"])
-        
-    except Exception as e:
-        print(f"❌ ОШИБКА в run_bot(): {e}")
-        import traceback
-        traceback.print_exc()
-
-# ============ ЗАПУСК БОТА ============
-print("🚀 Railway: запускаю бота...")
-
-if not TELEGRAM_TOKEN:
-    print("❌ ОШИБКА: TELEGRAM_TOKEN не задан!")
-else:
-    print(f"✅ TELEGRAM_TOKEN задан: {TELEGRAM_TOKEN[:10]}...")
-    print("🔄 Запускаю бота в отдельном потоке...")
-    bot_thread = threading.Thread(target=run_bot, daemon=True)
-    bot_thread.start()
-    print("✅ Бот запущен в отдельном потоке")
-
-# ============ ЗАПУСК ВЕБ-СЕРВЕРА ============
+# ============ ЗАПУСК ============
 if __name__ == "__main__":
+    print("🚀 Запуск приложения...")
+    
+    if not TELEGRAM_TOKEN:
+        print("❌ ОШИБКА: TELEGRAM_TOKEN не задан!")
+        exit(1)
+    
+    print(f"✅ TELEGRAM_TOKEN задан: {TELEGRAM_TOKEN[:10]}...")
+    
+    # Создаём приложение бота
+    bot_app = Application.builder().token(TELEGRAM_TOKEN).build()
+    bot_app.add_handler(CommandHandler("start", start))
+    bot_app.add_handler(CommandHandler("help", help_command))
+    bot_app.add_handler(CommandHandler("stats", stats_command))
+    
+    print("✅ Обработчики команд добавлены")
+    print("🤖 Запуск Telegram бота...")
+    
+    def run_bot_in_thread():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            bot_app.run_polling(
+                allowed_updates=["message", "callback_query"],
+                stop_signals=[]  # Отключаем сигналы (Python 3.13)
+            )
+        except Exception as e:
+            print(f"❌ Ошибка в боте: {e}")
+    
+    # Запускаем бота в фоновом потоке
+    bot_thread = threading.Thread(target=run_bot_in_thread, daemon=True)
+    bot_thread.start()
+    print("✅ Бот запущен в фоновом потоке")
+    
+    time.sleep(0.5)
+    
+    # Запускаем веб-сервер
     port = int(os.getenv("PORT", 8000))
     print(f"🚀 Сервер запускается на порту {port}")
     uvicorn.run(app, host="0.0.0.0", port=port)
