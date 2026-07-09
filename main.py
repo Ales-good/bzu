@@ -266,11 +266,36 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     print(f"📩 /start от {user.first_name} (ID: {user.id}) в чате: {chat.type if chat else 'unknown'}")
     
-    # ОТПРАВЛЯЕМ ССЫЛКУ ВМЕСТО КНОПКИ
-    if chat and chat.type in ['group', 'supergroup']:
+    # В ЛИЧНЫХ СООБЩЕНИЯХ - web_app кнопка (открывается внутри Telegram)
+    if chat and chat.type == 'private':
+        keyboard = [[
+            InlineKeyboardButton(
+                "📊 Открыть дневник",
+                web_app=WebAppInfo(url=WEBAPP_URL)
+            )
+        ]]
+        
+        text = (
+            "👋 Привет! Я бот для учета БЖУ.\n\n"
+            "📝 Нажми на кнопку ниже, чтобы открыть дневник прямо в Telegram.\n\n"
+            "Добавь меня в группу, чтобы сравнивать результаты!\n\n"
+            "💡 Команды:\n"
+            "/start - Главное меню\n"
+            "/stats - Статистика за сегодня\n"
+            "/help - Помощь"
+        )
+        
+        await update.message.reply_text(
+            text,
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode='HTML'
+        )
+    
+    # В ГРУППАХ - ссылка
+    else:
         text = (
             "👋 Привет! Я бот для учета БЖУ в этой группе.\n\n"
-            "📝 Открой дневник по ссылке:\n"
+            "📝 Открой дневник по ссылке (откроется внутри Telegram):\n"
             f"<a href=\"{WEBAPP_URL}\">📊 Открыть дневник БЖУ</a>\n\n"
             "Там ты сможешь:\n"
             "✅ Вводить свои показатели (БЖУ + калории)\n"
@@ -281,24 +306,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "/stats - Статистика за сегодня\n"
             "/help - Помощь"
         )
-    else:
-        text = (
-            "👋 Привет! Я бот для учета БЖУ.\n\n"
-            "📝 Открой дневник по ссылке:\n"
-            f"<a href=\"{WEBAPP_URL}\">📊 Открыть дневник БЖУ</a>\n\n"
-            "Или нажми на кнопку <b>Menu</b> внизу экрана.\n"
-            "Добавь меня в группу, чтобы сравнивать результаты!\n\n"
-            "💡 Команды:\n"
-            "/start - Главное меню\n"
-            "/stats - Статистика за сегодня\n"
-            "/help - Помощь"
+        
+        await update.message.reply_text(
+            text,
+            parse_mode='HTML',
+            disable_web_page_preview=False
         )
-    
-    await update.message.reply_text(
-        text,
-        parse_mode='HTML',
-        disable_web_page_preview=False
-    )
 
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показывает статистику за сегодня"""
