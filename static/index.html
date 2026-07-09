@@ -834,6 +834,7 @@
                 userName = user.first_name || 'Гость';
                 document.getElementById('userName').textContent = userName;
                 document.getElementById('userAvatar').textContent = userName[0].toUpperCase();
+                console.log('👤 Пользователь:', userId, userName);
             }
         }
 
@@ -846,10 +847,14 @@
                     ...options,
                     headers: { 'Content-Type': 'application/json', ...options.headers }
                 });
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                if (!response.ok) {
+                    const text = await response.text();
+                    console.error('❌ API Error:', response.status, text);
+                    throw new Error(`HTTP ${response.status}: ${text}`);
+                }
                 return await response.json();
             } catch (error) {
-                console.error('API Error:', error);
+                console.error('❌ API Error:', error);
                 return null;
             }
         }
@@ -894,28 +899,27 @@
         }
 
         async function savePlanToServer() {
-            if (!userId) return;
-            
-            // Проверяем, что пользователь создан
-            try {
-                const check = await fetch(`/api/user/${userId}`);
-                if (!check.ok) {
-                    console.log('⏳ Пользователь ещё не создан, создаём...');
-                    await fetch(`/api/user/${userId}?first_name=${encodeURIComponent(userName)}`);
-                }
-            } catch (e) {
-                console.error('❌ Ошибка проверки пользователя:', e);
+            if (!userId) {
+                console.warn('⚠️ Нет userId для сохранения плана');
                 return;
             }
             
-            const planData = getPlanData();
-            const today = new Date().toISOString().split('T')[0];
             try {
+                const planData = getPlanData();
+                const today = new Date().toISOString().split('T')[0];
+                console.log('💾 Сохраняем план:', planData);
+                
                 const response = await fetch('/api/plan/save', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: userId, plan_data: planData, record_date: today })
+                    body: JSON.stringify({ 
+                        user_id: userId, 
+                        user_name: userName,
+                        plan_data: planData, 
+                        record_date: today 
+                    })
                 });
+                
                 if (response.ok) {
                     console.log('✅ План сохранён');
                 } else {
@@ -926,6 +930,7 @@
                 console.error('❌ Ошибка:', error);
             }
         }
+        
         async function loadPlanFromServer() {
             if (!userId) return false;
             try {
@@ -992,6 +997,46 @@
         }
 
         function renderHistoryCharts(data) {
+            if (!data || !data.dates || data.dates.length === 0) {
+                console.log('📊 Нет данных для графиков');
+                // Показываем пустой график
+                const ctx1 = document.getElementById('historyCaloriesChart').getContext('2d');
+                if (historyCaloriesChart) historyCaloriesChart.destroy();
+                historyCaloriesChart = new Chart(ctx1, {
+                    type: 'line',
+                    data: {
+                        labels: ['Нет данных'],
+                        datasets: [{
+                            label: '🔥 Калории',
+                            data: [0],
+                            borderColor: '#4D96FF',
+                            backgroundColor: 'rgba(77,150,255,0.1)',
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: { color: 'rgba(255,255,255,0.05)' },
+                                ticks: { color: 'rgba(255,255,255,0.4)' }
+                            },
+                            x: {
+                                grid: { display: false },
+                                ticks: { color: 'rgba(255,255,255,0.4)' }
+                            }
+                        }
+                    }
+                });
+                return;
+            }
+            
             const labels = data.dates.map(d => {
                 const parts = d.split('-');
                 return `${parts[2]}.${parts[1]}`;
@@ -1005,7 +1050,7 @@
                     labels: labels,
                     datasets: [{
                         label: '🔥 Калории',
-                        data: data.calories,
+                        data: data.calories || [],
                         borderColor: '#4D96FF',
                         backgroundColor: 'rgba(77,150,255,0.1)',
                         fill: true,
@@ -1050,7 +1095,7 @@
                     datasets: [
                         {
                             label: '✅ Выполнено',
-                            data: data.plan_completed,
+                            data: data.plan_completed || [],
                             backgroundColor: 'rgba(107,203,119,0.6)',
                             borderColor: '#6BCB77',
                             borderWidth: 1,
@@ -1059,7 +1104,7 @@
                         },
                         {
                             label: '📋 Всего',
-                            data: data.plan_total,
+                            data: data.plan_total || [],
                             backgroundColor: 'rgba(255,255,255,0.05)',
                             borderColor: 'rgba(255,255,255,0.2)',
                             borderWidth: 1,
@@ -1111,42 +1156,67 @@
         // ============ ЗАКРЫТИЕ ============
         function closeApp() {
             console.log('🔒 Закрываем приложение...');
+            
+            // Сохраняем план
             savePlanToServer();
+            
+            // Сохраняем БЖУ
             const data = {
                 user_id: userId,
+                user_name: userName,
                 protein: parseFloat(document.getElementById('protein').value) || 0,
                 fat: parseFloat(document.getElementById('fat').value) || 0,
                 carbs: parseFloat(document.getElementById('carbs').value) || 0,
                 fiber: parseFloat(document.getElementById('fiber').value) || 0,
                 calories: parseFloat(document.getElementById('calories').value) || 0
             };
+            
             fetch('/api/save', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
-            }).catch(() => {});
-            if (tg) {
-                tg.close();
-            } else {
-                window.close();
+            }).then(() => {
+                console.log('✅ Данные сохранены при закрытии');
+            }).catch(err => {
+                console.error('❌ Ошибка при закрытии:', err);
+            });
+            
+            // Закрываем
+            try {
+                if (tg) {
+                    tg.close();
+                } else {
+                    window.close();
+                }
+            } catch (e) {
+                console.log('ℹ️ Не удалось закрыть окно');
             }
         }
 
         // ============ БЖУ ============
         async function loadUserData() {
             if (!userId) {
+                // Если нет Telegram, создаем тестового пользователя
                 userId = Date.now();
-                document.getElementById('userName').textContent = 'Тест';
+                userName = 'Тест';
+                document.getElementById('userName').textContent = userName;
                 document.getElementById('userAvatar').textContent = 'Т';
+                console.log('👤 Тестовый пользователь:', userId);
                 return;
             }
         
             try {
-                // 1. Сначала СОЗДАЁМ пользователя (или получаем существующего)
+                console.log('📥 Загружаем данные пользователя:', userId);
+                
+                // СОЗДАЁМ пользователя с именем
                 const url = `/api/user/${userId}?first_name=${encodeURIComponent(userName)}`;
                 const data = await apiCall(url);
-                if (!data) return;
+                if (!data) {
+                    console.error('❌ Не удалось загрузить пользователя');
+                    return;
+                }
         
+                console.log('✅ Данные пользователя загружены');
                 limits = data.limits;
                 const record = data.today_record || {};
                 userData = {
@@ -1169,7 +1239,7 @@
                 updateStats();
                 updateProgressBars();
         
-                // 2. ТЕПЕРЬ загружаем план (пользователь уже точно существует!)
+                // Загружаем план
                 await loadPlanFromServer();
         
                 if (!document.getElementById('tabCompare').classList.contains('hidden')) {
@@ -1177,7 +1247,7 @@
                     loadComparison();
                 }
             } catch (error) {
-                console.error('❌ Ошибка:', error);
+                console.error('❌ Ошибка загрузки:', error);
             }
         }
 
@@ -1250,9 +1320,14 @@
         }
 
         async function saveData() {
+            if (!userId) {
+                showToast('❌ Ошибка: пользователь не идентифицирован', 'error');
+                return;
+            }
+            
             const data = {
                 user_id: userId,
-                user_name: userName,  // <-- ДОБАВЬ ЭТО
+                user_name: userName,
                 protein: parseFloat(document.getElementById('protein').value) || 0,
                 fat: parseFloat(document.getElementById('fat').value) || 0,
                 carbs: parseFloat(document.getElementById('carbs').value) || 0,
@@ -1260,24 +1335,36 @@
                 calories: parseFloat(document.getElementById('calories').value) || 0
             };
 
-            const result = await apiCall('/api/save', {
-                method: 'POST',
-                body: JSON.stringify(data)
-            });
+            console.log('💾 Сохраняем данные:', data);
 
-            if (result && result.status === 'success') {
-                userData = data;
-                updateStats();
-                updateProgressBars();
-                showToast('✅ Сохранено!', 'success');
-            } else {
+            try {
+                const result = await apiCall('/api/save', {
+                    method: 'POST',
+                    body: JSON.stringify(data)
+                });
+
+                if (result && result.status === 'success') {
+                    userData = data;
+                    updateStats();
+                    updateProgressBars();
+                    showToast('✅ Сохранено!', 'success');
+                    console.log('✅ Данные сохранены');
+                } else {
+                    showToast('❌ Ошибка сохранения: ' + (result?.message || 'неизвестная ошибка'), 'error');
+                }
+            } catch (error) {
+                console.error('❌ Ошибка сохранения:', error);
                 showToast('❌ Ошибка сохранения', 'error');
             }
         }
 
         async function resetToday() {
             if (!confirm('Сбросить данные за сегодня?')) return;
-            const data = { user_id: userId, protein: 0, fat: 0, carbs: 0, fiber: 0, calories: 0 };
+            const data = { 
+                user_id: userId, 
+                user_name: userName,
+                protein: 0, fat: 0, carbs: 0, fiber: 0, calories: 0 
+            };
             await apiCall('/api/save', { method: 'POST', body: JSON.stringify(data) });
             userData = data;
             ['protein', 'fat', 'carbs', 'fiber', 'calories'].forEach(f => document.getElementById(f).value = 0);
@@ -1288,51 +1375,64 @@
 
         // ============ СРАВНЕНИЕ ============
         async function loadComparison() {
-            const data = await apiCall('/api/today');
-            if (!data) return;
+            try {
+                const data = await apiCall('/api/today');
+                if (!data) {
+                    document.getElementById('comparisonContainer').innerHTML = 
+                        '<p style="text-align:center;color:var(--text-secondary);padding:20px;">❌ Ошибка загрузки</p>';
+                    return;
+                }
 
-            const container = document.getElementById('comparisonContainer');
-            if (data.length === 0) {
-                container.innerHTML = '<p style="text-align:center;color:var(--text-secondary);padding:20px;">📭 Нет данных</p>';
-                return;
-            }
+                const container = document.getElementById('comparisonContainer');
+                if (data.length === 0) {
+                    container.innerHTML = '<p style="text-align:center;color:var(--text-secondary);padding:20px;">📭 Нет данных</p>';
+                    return;
+                }
 
-            let html = `<div style="overflow-x:auto;"><table class="comparison-table"><thead><tr>
-                <th>Участник</th><th>🍗</th><th>🧈</th><th>🍞</th><th>🥦</th><th>🔥</th><th>Статус</th>
-            </tr></thead><tbody>`;
+                let html = `<div style="overflow-x:auto;"><table class="comparison-table"><thead><tr>
+                    <th>Участник</th><th>🍗</th><th>🧈</th><th>🍞</th><th>🥦</th><th>🔥</th><th>Статус</th>
+                </tr></thead><tbody>`;
 
-            data.forEach(rec => {
-                const name = rec.first_name || rec.username || `User ${rec.user_id}`;
-                const total = rec.protein + rec.fat + rec.carbs + rec.fiber + rec.calories;
-                const isActive = total > 0;
-                const getBadge = (status) => {
-                    const map = {
-                        'good': '<span class="badge good">✅</span>',
-                        'under': '<span class="badge under">⬇️</span>',
-                        'over': '<span class="badge over">⬆️</span>',
-                        'empty': '<span class="badge empty">⚪</span>'
+                data.forEach(rec => {
+                    const name = rec.first_name || rec.username || `User ${rec.user_id}`;
+                    const total = rec.protein + rec.fat + rec.carbs + rec.fiber + rec.calories;
+                    const isActive = total > 0;
+                    
+                    const getBadge = (status) => {
+                        const map = {
+                            'good': '<span class="badge good">✅</span>',
+                            'under': '<span class="badge under">⬇️</span>',
+                            'over': '<span class="badge over">⬆️</span>',
+                            'empty': '<span class="badge empty">⚪</span>'
+                        };
+                        return map[status] || map.empty;
                     };
-                    return map[status] || map.empty;
-                };
-                const statusMap = {
-                    'good': '✅ Норма',
-                    'under': '⬇️ Низкий',
-                    'over': '⬆️ Высокий',
-                    'empty': '⚪ Нет'
-                };
-                html += `<tr>
-                    <td class="user-name">${isActive ? '🟢' : '⚪'} ${name}</td>
-                    <td>${rec.protein.toFixed(0)} ${getBadge(rec.protein_status)}</td>
-                    <td>${rec.fat.toFixed(0)} ${getBadge(rec.fat_status)}</td>
-                    <td>${rec.carbs.toFixed(0)} ${getBadge(rec.carbs_status)}</td>
-                    <td>${rec.fiber.toFixed(0)} ${getBadge(rec.fiber_status)}</td>
-                    <td>${rec.calories.toFixed(0)} ${getBadge(rec.calories_status)}</td>
-                    <td>${statusMap[rec.overall_status] || '⚪'}</td>
-                </tr>`;
-            });
+                    
+                    const statusMap = {
+                        'good': '✅ Норма',
+                        'under': '⬇️ Низкий',
+                        'over': '⬆️ Высокий',
+                        'empty': '⚪ Нет'
+                    };
+                    
+                    html += `<tr>
+                        <td class="user-name">${isActive ? '🟢' : '⚪'} ${name}</td>
+                        <td>${rec.protein.toFixed(0)} ${getBadge(rec.protein_status)}</td>
+                        <td>${rec.fat.toFixed(0)} ${getBadge(rec.fat_status)}</td>
+                        <td>${rec.carbs.toFixed(0)} ${getBadge(rec.carbs_status)}</td>
+                        <td>${rec.fiber.toFixed(0)} ${getBadge(rec.fiber_status)}</td>
+                        <td>${rec.calories.toFixed(0)} ${getBadge(rec.calories_status)}</td>
+                        <td>${statusMap[rec.overall_status] || '⚪'}</td>
+                    </tr>`;
+                });
 
-            html += `</tbody></table></div>`;
-            container.innerHTML = html;
+                html += `</tbody></table></div>`;
+                container.innerHTML = html;
+            } catch (error) {
+                console.error('❌ Ошибка загрузки сравнения:', error);
+                document.getElementById('comparisonContainer').innerHTML = 
+                    '<p style="text-align:center;color:var(--text-secondary);padding:20px;">❌ Ошибка загрузки</p>';
+            }
         }
 
         // ============ TABS ============
