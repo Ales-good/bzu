@@ -14,7 +14,7 @@
             --bg: #0F0F1A;
             --card: rgba(255,255,255,0.05);
             --card-border: rgba(255,255,255,0.08);
-            --text: #FFFFFF;
+            --text: #FFFFFF;АМ
             --text-secondary: rgba(255,255,255,0.6);
             --shadow: 0 8px 32px rgba(0,0,0,0.4);
             --radius: 20px;
@@ -860,35 +860,57 @@
 
         // ============ TELEGRAM ============
         const tg = window.Telegram?.WebApp;
+        let userId = null;
+        let userName = 'Гость';
+        let isTelegramUser = false;
+        
         if (tg) {
-            tg.expand();
-            tg.ready();
-            const user = tg.initDataUnsafe?.user;
-            if (user) {
-                userId = user.id;
-                userName = user.first_name || 'Гость';
-                document.getElementById('userName').textContent = userName;
-                document.getElementById('userAvatar').textContent = userName[0].toUpperCase();
-                console.log('👤 Пользователь из Telegram:', userId, userName);
+            try {
+                tg.expand();
+                tg.ready();
+                const user = tg.initDataUnsafe?.user;
+                if (user && user.id) {
+                    userId = user.id;
+                    userName = user.first_name || 'Гость';
+                    isTelegramUser = true;
+                    console.log('✅ Пользователь из Telegram:', { userId, userName });
+                    
+                    // Сохраняем в localStorage
+                    localStorage.setItem('bzu_user_id', userId);
+                    localStorage.setItem('bzu_user_name', userName);
+                } else {
+                    console.warn('⚠️ Telegram есть, но пользователь не получен');
+                }
+            } catch (e) {
+                console.error('❌ Ошибка Telegram:', e);
             }
         }
-
+        
+        // ТОЛЬКО если НЕТ Telegram ИЛИ НЕТ пользователя - создаем нового
         if (!userId) {
             const savedId = localStorage.getItem('bzu_user_id');
             if (savedId) {
                 userId = parseInt(savedId);
                 userName = localStorage.getItem('bzu_user_name') || 'Гость';
+                console.log('📦 Загружено из localStorage:', { userId, userName });
             } else {
-                userId = Date.now();
+                // НЕ СОЗДАЕМ НОВОГО! Ждем Telegram
+                console.warn('⚠️ Нет пользователя, ждем Telegram...');
+                userId = null;
                 userName = 'Гость';
-                localStorage.setItem('bzu_user_id', userId);
-                localStorage.setItem('bzu_user_name', userName);
             }
+        }
+        
+        // Обновляем UI только если есть пользователь
+        if (userId) {
             document.getElementById('userName').textContent = userName;
             document.getElementById('userAvatar').textContent = userName[0].toUpperCase();
+        } else {
+            document.getElementById('userName').textContent = 'Загрузка...';
+            document.getElementById('userAvatar').textContent = '?';
         }
-
-        document.getElementById('currentDate').textContent = new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+        
+        console.log('👤 Финальный пользователь:', { userId, userName, isTelegramUser });
 
         // ============ API ============
         async function apiCall(url, options = {}) {
@@ -1026,15 +1048,73 @@
                 } catch(e) { console.log('Не удалось закрыть'); }
             }, 300);
         }
+        function syncTelegram() {
+            if (tg) {
+                const user = tg.initDataUnsafe?.user;
+                if (user && user.id) {
+                    userId = user.id;
+                    userName = user.first_name || 'Гость';
+                    localStorage.setItem('bzu_user_id', userId);
+                    localStorage.setItem('bzu_user_name', userName);
+                    document.getElementById('userName').textContent = userName;
+                    document.getElementById('userAvatar').textContent = userName[0].toUpperCase();
+                    showToast(`✅ Синхронизировано с ${userName}`, 'success');
+                    loadUserData();
+                } else {
+                    showToast('❌ Не удалось получить данные из Telegram', 'error');
+                }
+            } else {
+                showToast('❌ Не Telegram WebApp', 'error');
+            }
+        }
 
+        <button class="tg-button" onclick="syncTelegram()" style="margin-top: 10px; background: rgba(77,150,255,0.15); border-color: rgba(77,150,255,0.3); color: #4D96FF;">
+            🔄 Синхронизировать с Telegram
+        </button>
         // ============ БЖУ ============
         async function loadUserData() {
-            if (!userId) return;
+            console.log('📥 loadUserData() вызван');
+            
+            // ЕСЛИ НЕТ USER_ID - НЕ ЗАГРУЖАЕМ!
+            if (!userId) {
+                console.warn('⚠️ Нет userId, ждем...');
+                // Пробуем получить из Telegram снова через 2 секунды
+                setTimeout(() => {
+                    if (tg) {
+                        const user = tg.initDataUnsafe?.user;
+                        if (user && user.id) {
+                            userId = user.id;
+                            userName = user.first_name || 'Гость';
+                            localStorage.setItem('bzu_user_id', userId);
+                            localStorage.setItem('bzu_user_name', userName);
+                            document.getElementById('userName').textContent = userName;
+                            document.getElementById('userAvatar').textContent = userName[0].toUpperCase();
+                            loadUserData(); // Повторно загружаем
+                        }
+                    }
+                }, 2000);
+                return;
+            }
+        
             try {
+                console.log('📥 Загружаем данные для userId:', userId);
                 const data = await apiCall(`/api/user/${userId}`);
-                if (!data) return;
-
-                limits = data.limits;
+                if (!data) {
+                    console.error('❌ Не удалось загрузить пользователя');
+                    return;
+                }
+        
+                console.log('✅ Данные загружены:', data);
+                
+                // Обновляем имя если нужно
+                if (data.user && data.user.first_name && data.user.first_name !== 'Гость') {
+                    userName = data.user.first_name;
+                    document.getElementById('userName').textContent = userName;
+                    document.getElementById('userAvatar').textContent = userName[0].toUpperCase();
+                    localStorage.setItem('bzu_user_name', userName);
+                }
+                
+                limits = data.limits || limits;
                 const record = data.today_record || {};
                 userData = {
                     protein: record.protein || 0,
@@ -1043,23 +1123,35 @@
                     fiber: record.fiber || 0,
                     calories: record.calories || 0
                 };
-
+        
                 const fields = ['protein', 'fat', 'carbs', 'fiber', 'calories'];
                 fields.forEach(f => {
-                    document.getElementById(f).value = userData[f] || 0;
-                    document.getElementById(`limit${f.charAt(0).toUpperCase() + f.slice(1)}Min`).textContent = limits[`${f}_min`] || 0;
-                    document.getElementById(`limit${f.charAt(0).toUpperCase() + f.slice(1)}Max`).textContent = limits[`${f}_max`] || 0;
-                    document.getElementById(`${f}MinLabel`).textContent = limits[`${f}_min`] || 0;
-                    document.getElementById(`${f}MaxLabel`).textContent = limits[`${f}_max`] || 0;
+                    const input = document.getElementById(f);
+                    if (input) input.value = userData[f] || 0;
+                    
+                    const minEl = document.getElementById(`limit${f.charAt(0).toUpperCase() + f.slice(1)}Min`);
+                    const maxEl = document.getElementById(`limit${f.charAt(0).toUpperCase() + f.slice(1)}Max`);
+                    const minLabel = document.getElementById(`${f}MinLabel`);
+                    const maxLabel = document.getElementById(`${f}MaxLabel`);
+                    
+                    if (minEl) minEl.textContent = limits[`${f}_min`] || 0;
+                    if (maxEl) maxEl.textContent = limits[`${f}_max`] || 0;
+                    if (minLabel) minLabel.textContent = limits[`${f}_min`] || 0;
+                    if (maxLabel) maxLabel.textContent = limits[`${f}_max`] || 0;
                 });
-
+        
                 updateStats();
                 updateProgressBars();
                 await loadPlanFromServer();
-
+        
                 if (!document.getElementById('tabCompare').classList.contains('hidden')) {
                     loadAnalytics(currentDays);
                 }
+                
+                if (userName !== 'Гость') {
+                    showToast(`👋 Привет, ${userName}!`, 'success');
+                }
+                
             } catch (error) {
                 console.error('❌ Ошибка загрузки:', error);
             }
