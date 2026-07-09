@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>БЖУ Дневник</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -23,7 +26,7 @@
             background: var(--bg);
             color: var(--text);
             padding: 20px;
-            max-width: 800px;
+            max-width: 600px;
             margin: 0 auto;
             min-height: 100vh;
             padding-bottom: 100px;
@@ -526,7 +529,7 @@
             left: 50%;
             transform: translateX(-50%);
             width: calc(100% - 40px);
-            max-width: 760px;
+            max-width: 560px;
             padding: 14px;
             background: rgba(255,255,255,0.05);
             border: 1px solid rgba(255,255,255,0.1);
@@ -796,9 +799,8 @@
         </div>
     </div>
 
-    <!-- Tab Compare - Новая аналитика -->
+    <!-- Tab Compare -->
     <div id="tabCompare" class="hidden">
-        <!-- Выбор периода -->
         <div class="card">
             <div class="card-title">📊 Аналитика</div>
             <div class="period-filter">
@@ -806,12 +808,9 @@
                 <button class="period-btn" data-period="30" onclick="setPeriod(30)">Месяц</button>
                 <button class="period-btn" data-period="90" onclick="setPeriod(90)">3 мес</button>
             </div>
-            <div class="user-selector" id="userSelector">
-                <!-- Сюда будут добавляться пользователи -->
-            </div>
+            <div class="user-selector" id="userSelector"></div>
         </div>
 
-        <!-- График 1: Калории -->
         <div class="card">
             <div class="card-title">🔥 Динамика калорий</div>
             <div class="chart-container-large">
@@ -819,7 +818,6 @@
             </div>
         </div>
 
-        <!-- График 2: БЖУ (столбчатая) -->
         <div class="card">
             <div class="card-title">📊 БЖУ (белки, жиры, углеводы, клетчатка)</div>
             <div class="chart-container-large">
@@ -827,7 +825,6 @@
             </div>
         </div>
 
-        <!-- График 3: Упражнения (отжимания, приседания, пресс) -->
         <div class="card">
             <div class="card-title">💪 Упражнения (количество)</div>
             <div class="chart-container-large">
@@ -835,9 +832,8 @@
             </div>
         </div>
 
-        <!-- График 4: Выполнение условий (галочки) -->
         <div class="card">
-            <div class="card-title">✅ Выполнение плана (массаж, баня, бассейн, не ел после 18, зал)</div>
+            <div class="card-title">✅ Выполнение плана</div>
             <div class="chart-container-large">
                 <canvas id="conditionsChart"></canvas>
             </div>
@@ -846,364 +842,757 @@
 
     <button class="tg-button" onclick="closeApp()">✖️ Закрыть</button>
 
-    from fastapi import FastAPI, Request, HTTPException
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, Response
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import Optional, List
-import uvicorn
-import os
-import logging
-from datetime import date
+    <script>
+        const API_URL = window.location.origin;
+        let userId = null;
+        let userName = 'Гость';
+        let userData = { protein: 0, fat: 0, carbs: 0, fiber: 0, calories: 0 };
+        let limits = {
+            protein_min: 150, protein_max: 200,
+            fat_min: 70, fat_max: 80,
+            carbs_min: 80, carbs_max: 100,
+            fiber_min: 10, fiber_max: 20,
+            calories_min: 2000, calories_max: 2500
+        };
+        let currentDays = 7;
+        let saveTimeoutId = null;
+        let selectedUsers = [];
 
-from database_mysql import (
-    init_db, get_or_create_user, save_bzu_record, 
-    get_today_records, get_user_record, get_user_limits,
-    get_all_users, update_limits,
-    save_plan_record, get_plan_record, get_plan_history,
-    get_user_history, update_user_name
-)
-
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
-from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
-
-logging.basicConfig(level=logging.INFO)
-
-print("🔧 Инициализация БД...")
-init_db()
-print("✅ БД готова")
-
-TELEGRAM_TOKEN = "8704240954:AAG4AV6Wrt_9aQhn400ljcWTNq80gc0LpWM"
-WEBAPP_URL = os.getenv("WEBAPP_URL", "https://bzu-production.up.railway.app")
-WEBHOOK_URL = f"{WEBAPP_URL}/webhook"
-
-app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-# ============ МОДЕЛИ ============
-class BZUData(BaseModel):
-    user_id: int
-    user_name: Optional[str] = None
-    protein: float = 0
-    fat: float = 0
-    carbs: float = 0
-    fiber: float = 0
-    calories: float = 0
-    record_date: Optional[str] = None
-
-class LimitsData(BaseModel):
-    user_id: int
-    protein_min: float
-    protein_max: float
-    fat_min: float
-    fat_max: float
-    carbs_min: float
-    carbs_max: float
-    fiber_min: float
-    fiber_max: float
-    calories_min: float
-    calories_max: float
-
-class PlanData(BaseModel):
-    user_id: int
-    user_name: Optional[str] = None
-    plan_data: dict
-    record_date: Optional[str] = None
-
-# ============ API ============
-@app.get("/")
-async def index():
-    return FileResponse("static/index.html")
-
-@app.get("/api/user/{user_id}")
-async def get_user(user_id: int):
-    # Просто получаем или создаем пользователя
-    user = get_or_create_user(user_id)
-    limits = get_user_limits(user_id)
-    today_record = get_user_record(user_id)
-    
-    return {
-        "user": user,
-        "limits": limits,
-        "today_record": today_record or {
-            "protein": 0, "fat": 0, "carbs": 0, "fiber": 0, "calories": 0
+        // ============ TELEGRAM ============
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.expand();
+            tg.ready();
+            const user = tg.initDataUnsafe?.user;
+            if (user) {
+                userId = user.id;
+                userName = user.first_name || 'Гость';
+                document.getElementById('userName').textContent = userName;
+                document.getElementById('userAvatar').textContent = userName[0].toUpperCase();
+                console.log('👤 Пользователь из Telegram:', userId, userName);
+            }
         }
-    }
 
-@app.post("/api/save")
-async def save_data(data: BZUData):
-    try:
-        if data.user_name:
-            update_user_name(data.user_id, data.user_name)
+        if (!userId) {
+            const savedId = localStorage.getItem('bzu_user_id');
+            if (savedId) {
+                userId = parseInt(savedId);
+                userName = localStorage.getItem('bzu_user_name') || 'Гость';
+            } else {
+                userId = Date.now();
+                userName = 'Гость';
+                localStorage.setItem('bzu_user_id', userId);
+                localStorage.setItem('bzu_user_name', userName);
+            }
+            document.getElementById('userName').textContent = userName;
+            document.getElementById('userAvatar').textContent = userName[0].toUpperCase();
+        }
+
+        document.getElementById('currentDate').textContent = new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+
+        // ============ API ============
+        async function apiCall(url, options = {}) {
+            try {
+                const response = await fetch(url, {
+                    ...options,
+                    headers: { 'Content-Type': 'application/json', ...options.headers }
+                });
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('❌ API Error:', error);
+                return null;
+            }
+        }
+
+        // ============ ПЛАН ============
+        function getPlanData() {
+            const items = document.querySelectorAll('.plan-item');
+            const data = {};
+            items.forEach(el => {
+                const id = el.dataset.id;
+                const isDone = el.classList.contains('done');
+                const input = el.querySelector('.input-count');
+                const count = input ? parseInt(input.value) || 0 : 0;
+                data[id] = { done: isDone, count: count };
+            });
+            return data;
+        }
+
+        function updatePlanProgress() {
+            const items = document.querySelectorAll('.plan-item');
+            const done = document.querySelectorAll('.plan-item.done');
+            const total = items.length;
+            const count = done.length;
+            const badge = document.getElementById('planProgress');
+            badge.textContent = `${count}/${total}`;
+            badge.className = count === total ? 'badge-done' : 'badge-pending';
+        }
+
+        function togglePlan(el) {
+            const isDone = el.classList.contains('done');
+            if (isDone) {
+                el.classList.remove('done');
+                el.classList.add('pending');
+                el.querySelector('.status').textContent = '◻️';
+            } else {
+                el.classList.remove('pending');
+                el.classList.add('done');
+                el.querySelector('.status').textContent = '✅';
+            }
+            updatePlanProgress();
+            savePlanToServer();
+        }
+
+        async function savePlanToServer() {
+            if (!userId) return;
+            try {
+                const planData = getPlanData();
+                const today = new Date().toISOString().split('T')[0];
+                await fetch('/api/plan/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: userId, user_name: userName, plan_data: planData, record_date: today })
+                });
+            } catch (error) {
+                console.error('❌ Ошибка сохранения плана:', error);
+            }
+        }
         
-        save_bzu_record(
-            data.user_id,
-            data.protein,
-            data.fat,
-            data.carbs,
-            data.fiber,
-            data.calories,
-            data.record_date
-        )
-        return {"status": "success", "message": "Данные сохранены"}
-    except Exception as e:
-        print(f"❌ Ошибка сохранения: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
+        async function loadPlanFromServer() {
+            if (!userId) return false;
+            try {
+                const response = await fetch(`/api/plan/get/${userId}`);
+                const data = await response.json();
+                if (data.plan && Object.keys(data.plan).length > 0) {
+                    const plan = data.plan;
+                    document.querySelectorAll('.plan-item').forEach(el => {
+                        const id = el.dataset.id;
+                        if (plan[id]) {
+                            if (plan[id].done) {
+                                el.classList.remove('pending');
+                                el.classList.add('done');
+                                el.querySelector('.status').textContent = '✅';
+                            } else {
+                                el.classList.remove('done');
+                                el.classList.add('pending');
+                                el.querySelector('.status').textContent = '◻️';
+                            }
+                            const input = el.querySelector('.input-count');
+                            if (input && plan[id].count) {
+                                input.value = plan[id].count;
+                            }
+                        }
+                    });
+                    updatePlanProgress();
+                    return true;
+                }
+                return false;
+            } catch (error) {
+                console.error('❌ Ошибка загрузки плана:', error);
+                return false;
+            }
+        }
 
-@app.get("/api/today")
-async def get_today():
-    records = get_today_records()
-    for rec in records:
-        rec['protein_status'] = get_status(rec['protein'], rec['protein_min'], rec['protein_max'])
-        rec['fat_status'] = get_status(rec['fat'], rec['fat_min'], rec['fat_max'])
-        rec['carbs_status'] = get_status(rec['carbs'], rec['carbs_min'], rec['carbs_max'])
-        rec['fiber_status'] = get_status(rec['fiber'], rec['fiber_min'], rec['fiber_max'])
-        rec['calories_status'] = get_status(rec['calories'], rec['calories_min'], rec['calories_max'])
-        
-        statuses = [rec['protein_status'], rec['fat_status'], rec['carbs_status'], rec['fiber_status']]
-        if all(s == 'good' for s in statuses):
-            rec['overall_status'] = 'good'
-        elif any(s == 'over' for s in statuses):
-            rec['overall_status'] = 'over'
-        elif any(s == 'under' for s in statuses):
-            rec['overall_status'] = 'under'
-        else:
-            rec['overall_status'] = 'empty'
-    return records
+        document.addEventListener('input', function(e) {
+            if (e.target.classList.contains('input-count')) {
+                const el = e.target.closest('.plan-item');
+                const val = parseInt(e.target.value);
+                if (val > 0) {
+                    el.classList.remove('pending');
+                    el.classList.add('done');
+                    el.querySelector('.status').textContent = '✅';
+                } else {
+                    el.classList.remove('done');
+                    el.classList.add('pending');
+                    el.querySelector('.status').textContent = '◻️';
+                }
+                updatePlanProgress();
+                savePlanToServer();
+            }
+        });
 
-def get_status(value, min_val, max_val):
-    if value is None:
-        value = 0
-    if min_val is None:
-        min_val = 0
-    if max_val is None:
-        max_val = 1
-    
-    if value == 0:
-        return 'empty'
-    elif value < min_val:
-        return 'under'
-    elif value > max_val:
-        return 'over'
-    else:
-        return 'good'
+        // ============ ЗАКРЫТИЕ ============
+        function closeApp() {
+            console.log('🔒 Закрываем приложение...');
+            savePlanToServer();
+            saveData();
+            setTimeout(() => {
+                try {
+                    if (tg && tg.close) tg.close();
+                    else if (window.close) window.close();
+                } catch(e) { console.log('Не удалось закрыть'); }
+            }, 300);
+        }
 
-@app.get("/api/users")
-async def get_users():
-    return get_all_users()
+        // ============ БЖУ ============
+        async function loadUserData() {
+            if (!userId) return;
+            try {
+                const data = await apiCall(`/api/user/${userId}`);
+                if (!data) return;
 
-@app.post("/api/limits")
-async def update_limits_endpoint(data: LimitsData):
-    try:
-        update_limits(
-            data.user_id,
-            data.protein_min, data.protein_max,
-            data.fat_min, data.fat_max,
-            data.carbs_min, data.carbs_max,
-            data.fiber_min, data.fiber_max,
-            data.calories_min, data.calories_max
-        )
-        return {"status": "success", "message": "Лимиты обновлены"}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+                limits = data.limits;
+                const record = data.today_record || {};
+                userData = {
+                    protein: record.protein || 0,
+                    fat: record.fat || 0,
+                    carbs: record.carbs || 0,
+                    fiber: record.fiber || 0,
+                    calories: record.calories || 0
+                };
 
-@app.post("/api/plan/save")
-async def save_plan(data: PlanData):
-    try:
-        print(f"📥 Сохраняем план для user_id={data.user_id}")
-        
-        if data.user_name:
-            update_user_name(data.user_id, data.user_name)
-        
-        user = get_or_create_user(data.user_id)
-        if not user:
-            raise HTTPException(status_code=400, detail="Пользователь не найден")
-        
-        save_plan_record(data.user_id, data.plan_data, data.record_date)
-        return {"status": "success", "message": "План сохранен"}
-    except Exception as e:
-        print(f"❌ Ошибка: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
+                const fields = ['protein', 'fat', 'carbs', 'fiber', 'calories'];
+                fields.forEach(f => {
+                    document.getElementById(f).value = userData[f] || 0;
+                    document.getElementById(`limit${f.charAt(0).toUpperCase() + f.slice(1)}Min`).textContent = limits[`${f}_min`] || 0;
+                    document.getElementById(`limit${f.charAt(0).toUpperCase() + f.slice(1)}Max`).textContent = limits[`${f}_max`] || 0;
+                    document.getElementById(`${f}MinLabel`).textContent = limits[`${f}_min`] || 0;
+                    document.getElementById(`${f}MaxLabel`).textContent = limits[`${f}_max`] || 0;
+                });
 
-@app.get("/api/plan/get/{user_id}")
-async def get_plan(user_id: int, record_date: Optional[str] = None):
-    plan = get_plan_record(user_id, record_date)
-    return {"plan": plan or {}}
+                updateStats();
+                updateProgressBars();
+                await loadPlanFromServer();
 
-@app.get("/api/history/{user_id}")
-async def get_history(user_id: int, days: int = 90):
-    bzu_history = get_user_history(user_id, days)
-    plan_history = get_plan_history(user_id, days)
-    
-    plan_dict = {}
-    for p in plan_history:
-        date_str = p['record_date'].isoformat() if hasattr(p['record_date'], 'isoformat') else str(p['record_date'])
-        plan_dict[date_str] = p['plan_data']
-    
-    dates = []
-    calories = []
-    plan_completed = []
-    plan_total = []
-    plan_data_list = []
-    
-    for record in bzu_history:
-        date_str = record['record_date']
-        dates.append(date_str)
-        calories.append(float(record['calories']) if record['calories'] else 0)
-        
-        plan_data = plan_dict.get(date_str, {})
-        plan_data_list.append(plan_data)
-        
-        total_items = len(plan_data)
-        completed_items = 0
-        for v in plan_data.values():
-            if isinstance(v, dict):
-                if v.get('done', False) or v.get('count', 0) > 0:
-                    completed_items += 1
-            elif v:
-                completed_items += 1 if v else 0
-        
-        plan_total.append(total_items)
-        plan_completed.append(completed_items)
-    
-    return {
-        "dates": dates,
-        "calories": calories,
-        "plan_completed": plan_completed,
-        "plan_total": plan_total,
-        "plan_data": plan_data_list
-    }
+                if (!document.getElementById('tabCompare').classList.contains('hidden')) {
+                    loadAnalytics(currentDays);
+                }
+            } catch (error) {
+                console.error('❌ Ошибка загрузки:', error);
+            }
+        }
 
-# ============ ТЕЛЕГРАМ БОТ ============
-bot_app = None
+        function updateStats() {
+            const fields = ['protein', 'fat', 'carbs', 'fiber', 'calories'];
+            fields.forEach(f => {
+                const value = userData[f] || 0;
+                const min = limits[`${f}_min`] || 0;
+                const max = limits[`${f}_max`] || 1;
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message:
-        return
-    
-    user = update.effective_user
-    chat = update.effective_chat
-    
-    print(f"📩 /start от {user.first_name} (ID: {user.id}) в чате: {chat.type if chat else 'unknown'}")
-    
-    if chat and chat.type == 'private':
-        keyboard = [[
-            InlineKeyboardButton(
-                "📊 Открыть дневник",
-                web_app=WebAppInfo(url=WEBAPP_URL)
-            )
-        ]]
-        
-        text = (
-            "👋 Привет! Я бот для учета БЖУ.\n\n"
-            "📝 Нажми на кнопку ниже, чтобы открыть дневник.\n\n"
-            "💡 Команды:\n"
-            "/start - Главное меню\n"
-            "/stats - Статистика\n"
-            "/help - Помощь"
-        )
-        
-        await update.message.reply_text(
-            text,
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-    else:
-        text = (
-            "👋 Привет! Я бот для учета БЖУ.\n\n"
-            "📝 Открой дневник:\n"
-            f"<a href=\"{WEBAPP_URL}\">📊 Открыть дневник</a>"
-        )
-        
-        await update.message.reply_text(text, parse_mode='HTML')
+                document.getElementById(`stat${f.charAt(0).toUpperCase() + f.slice(1)}`).textContent = value;
 
-async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    records = get_today_records()
-    active_records = [r for r in records if r['protein'] + r['fat'] + r['carbs'] + r['fiber'] + r['calories'] > 0]
-    
-    if not active_records:
-        await update.message.reply_text("📭 Сегодня никто не ввел данные!")
-        return
-    
-    message = "📊 <b>Сводка за сегодня</b>\n\n"
-    for rec in active_records:
-        name = rec['first_name'] or rec['username'] or f"User {rec['user_id']}"
-        message += f"👤 <b>{name}</b>\n"
-        if rec['protein'] > 0:
-            message += f"  🍗 Белки: {rec['protein']:.0f}г\n"
-        if rec['fat'] > 0:
-            message += f"  🧈 Жиры: {rec['fat']:.0f}г\n"
-        if rec['carbs'] > 0:
-            message += f"  🍞 Углеводы: {rec['carbs']:.0f}г\n"
-        if rec['fiber'] > 0:
-            message += f"  🥦 Клетчатка: {rec['fiber']:.0f}г\n"
-        if rec['calories'] > 0:
-            message += f"  🔥 Калории: {rec['calories']:.0f}ккал\n"
-        message += "\n"
-    
-    await update.message.reply_text(message, parse_mode='HTML')
+                let statusText, statusClass;
+                if (value === 0) {
+                    statusText = '⚪';
+                    statusClass = 'empty';
+                } else if (value < min) {
+                    statusText = '⬇️';
+                    statusClass = 'warn';
+                } else if (value > max) {
+                    statusText = '⬆️';
+                    statusClass = 'over';
+                } else {
+                    statusText = '✅';
+                    statusClass = 'good';
+                }
 
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "🤖 <b>Команды:</b>\n\n"
-        "/start - Главное меню\n"
-        "/stats - Статистика\n"
-        "/help - Помощь",
-        parse_mode='HTML'
-    )
+                const el = document.getElementById(`status${f.charAt(0).toUpperCase() + f.slice(1)}`);
+                if (el) {
+                    el.textContent = statusText;
+                    el.className = `status ${statusClass}`;
+                }
 
-@app.post("/webhook")
-async def webhook(request: Request):
-    global bot_app
-    if bot_app is None:
-        return Response("Bot not initialized", status_code=500)
-    
-    try:
-        data = await request.json()
-        update = Update.de_json(data, bot_app.bot)
-        await bot_app.process_update(update)
-        return Response("OK", status_code=200)
-    except Exception as e:
-        print(f"❌ Webhook error: {e}")
-        return Response("Error", status_code=500)
+                const statusBadge = document.getElementById(`${f}StatusText`);
+                if (statusBadge) {
+                    const statusLabels = {
+                        'good': '✅ Норма',
+                        'under': '⬇️ Ниже',
+                        'over': '⬆️ Выше',
+                        'empty': '⚪ Не введено'
+                    };
+                    statusBadge.textContent = statusLabels[statusClass] || statusLabels.empty;
+                    statusBadge.className = `status-badge ${statusClass}`;
+                }
+            });
+        }
 
-@app.on_event("startup")
-async def startup():
-    global bot_app
-    try:
-        print("🤖 Инициализация бота...")
-        bot_app = Application.builder().token(TELEGRAM_TOKEN).build()
-        
-        bot_app.add_handler(CommandHandler("start", start))
-        bot_app.add_handler(CommandHandler("help", help_command))
-        bot_app.add_handler(CommandHandler("stats", stats_command))
-        
-        await bot_app.initialize()
-        await bot_app.start()
-        
-        await bot_app.bot.set_webhook(WEBHOOK_URL, drop_pending_updates=True)
-        print(f"✅ Webhook установлен: {WEBHOOK_URL}")
-        print("✅ Бот успешно запущен!")
-    except Exception as e:
-        print(f"❌ Ошибка запуска бота: {e}")
+        function updateProgressBars() {
+            const fields = ['protein', 'fat', 'carbs', 'fiber', 'calories'];
+            const colors = ['#FF6B6B', '#FFD93D', '#6BCB77', '#4D96FF', '#FF6B6B'];
+            fields.forEach((f, i) => {
+                const value = userData[f] || 0;
+                const max = limits[`${f}_max`] || 1;
+                const min = limits[`${f}_min`] || 0;
+                const percent = Math.min((value / max) * 100, 100);
+                const bar = document.getElementById(`${f}Progress`);
+                if (bar) {
+                    bar.style.width = `${percent}%`;
+                    if (value === 0) {
+                        bar.style.background = 'rgba(255,255,255,0.1)';
+                    } else if (value < min) {
+                        bar.style.background = '#FFD93D';
+                    } else if (value > max) {
+                        bar.style.background = '#FF6B6B';
+                    } else {
+                        bar.style.background = colors[i] || '#4D96FF';
+                    }
+                }
+            });
+        }
 
-@app.on_event("shutdown")
-async def shutdown():
-    global bot_app
-    if bot_app:
-        await bot_app.stop()
-        print("✅ Бот остановлен")
+        async function saveData() {
+            if (!userId) return;
+            
+            const data = {
+                user_id: userId,
+                user_name: userName !== 'Гость' ? userName : null,
+                protein: parseFloat(document.getElementById('protein').value) || 0,
+                fat: parseFloat(document.getElementById('fat').value) || 0,
+                carbs: parseFloat(document.getElementById('carbs').value) || 0,
+                fiber: parseFloat(document.getElementById('fiber').value) || 0,
+                calories: parseFloat(document.getElementById('calories').value) || 0
+            };
 
-if __name__ == "__main__":
-    port = int(os.getenv("PORT", 8080))
-    print(f"🚀 Сервер запускается на порту {port}")
-    uvicorn.run(app, host="0.0.0.0", port=port)
+            try {
+                const result = await apiCall('/api/save', {
+                    method: 'POST',
+                    body: JSON.stringify(data)
+                });
+                if (result && result.status === 'success') {
+                    userData = data;
+                    updateStats();
+                    updateProgressBars();
+                    showToast('✅ Сохранено!', 'success');
+                }
+            } catch (error) {
+                console.error('❌ Ошибка сохранения:', error);
+            }
+        }
+
+        async function resetToday() {
+            if (!confirm('Сбросить данные за сегодня?')) return;
+            const data = { user_id: userId, user_name: userName !== 'Гость' ? userName : null, protein: 0, fat: 0, carbs: 0, fiber: 0, calories: 0 };
+            await apiCall('/api/save', { method: 'POST', body: JSON.stringify(data) });
+            userData = data;
+            ['protein', 'fat', 'carbs', 'fiber', 'calories'].forEach(f => document.getElementById(f).value = 0);
+            updateStats();
+            updateProgressBars();
+            showToast('🔄 Сброшено', 'success');
+        }
+
+        // ============ АНАЛИТИКА ============
+        let caloriesChart = null;
+        let bzuChart = null;
+        let exercisesChart = null;
+        let conditionsChart = null;
+
+        async function loadAnalytics(days) {
+            try {
+                const users = await apiCall('/api/users');
+                if (!users) return;
+
+                const activeUsers = [];
+                for (const user of users) {
+                    const history = await apiCall(`/api/history/${user.user_id}?days=${days}`);
+                    if (history && history.dates && history.dates.length > 0) {
+                        const hasData = history.calories.some(c => c > 0);
+                        if (hasData) {
+                            activeUsers.push(user);
+                        }
+                    }
+                }
+
+                const userSelector = document.getElementById('userSelector');
+                userSelector.innerHTML = '';
+
+                if (activeUsers.length === 0) {
+                    userSelector.innerHTML = '<span style="color: var(--text-secondary); font-size: 14px;">📭 Нет активных пользователей</span>';
+                    return;
+                }
+
+                selectedUsers = [];
+                activeUsers.forEach((user, index) => {
+                    const chip = document.createElement('span');
+                    chip.className = 'user-chip';
+                    chip.dataset.userId = user.user_id;
+                    chip.textContent = user.first_name || `User ${user.user_id}`;
+                    
+                    const isCurrent = user.user_id === userId;
+                    if (isCurrent || (selectedUsers.length === 0 && index === 0)) {
+                        chip.classList.add('active');
+                        selectedUsers.push(user.user_id);
+                    }
+                    
+                    chip.onclick = function() {
+                        this.classList.toggle('active');
+                        const id = parseInt(this.dataset.userId);
+                        const idx = selectedUsers.indexOf(id);
+                        if (idx > -1) {
+                            selectedUsers.splice(idx, 1);
+                        } else {
+                            selectedUsers.push(id);
+                        }
+                        if (selectedUsers.length > 0) {
+                            loadAllCharts(days);
+                        }
+                    };
+                    
+                    userSelector.appendChild(chip);
+                });
+
+                if (selectedUsers.length > 0) {
+                    await loadAllCharts(days);
+                }
+            } catch (error) {
+                console.error('❌ Ошибка загрузки аналитики:', error);
+            }
+        }
+
+        async function loadAllCharts(days) {
+            if (selectedUsers.length === 0) return;
+            
+            const allData = {};
+            const userNames = {};
+            
+            const users = await apiCall('/api/users');
+            if (users) {
+                users.forEach(u => {
+                    userNames[u.user_id] = u.first_name || `User ${u.user_id}`;
+                });
+            }
+            
+            for (const uid of selectedUsers) {
+                const history = await apiCall(`/api/history/${uid}?days=${days}`);
+                if (history && history.dates && history.dates.length > 0) {
+                    allData[uid] = history;
+                }
+            }
+            
+            if (Object.keys(allData).length === 0) return;
+            
+            renderCaloriesChart(allData, userNames);
+            renderBZUChart(allData, userNames);
+            renderExercisesChart(allData, userNames);
+            renderConditionsChart(allData, userNames);
+        }
+
+        function renderCaloriesChart(allData, userNames) {
+            const ctx = document.getElementById('caloriesChart').getContext('2d');
+            if (caloriesChart) caloriesChart.destroy();
+            
+            const datasets = [];
+            const colors = ['#FF6B6B', '#4D96FF', '#6BCB77', '#FFD93D', '#FF9F43', '#A29BFE', '#FD79A8', '#00CEC9'];
+            let allLabels = [];
+            
+            Object.keys(allData).forEach((uid, index) => {
+                const data = allData[uid];
+                if (data && data.dates && data.dates.length > 0) {
+                    if (allLabels.length === 0) {
+                        allLabels = data.dates.map(d => {
+                            const parts = d.split('-');
+                            return `${parts[2]}.${parts[1]}`;
+                        });
+                    }
+                    datasets.push({
+                        label: userNames[uid] || `User ${uid}`,
+                        data: data.calories || [],
+                        borderColor: colors[index % colors.length],
+                        backgroundColor: colors[index % colors.length] + '20',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 3,
+                        pointHoverRadius: 6
+                    });
+                }
+            });
+            
+            if (datasets.length === 0) {
+                datasets.push({ label: 'Нет данных', data: [0], borderColor: '#666', fill: true, tension: 0.4 });
+                allLabels = ['Нет данных'];
+            }
+            
+            caloriesChart = new Chart(ctx, {
+                type: 'line',
+                data: { labels: allLabels, datasets: datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: { color: 'rgba(255,255,255,0.6)', font: { size: 10 } }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(ctx) {
+                                    return ctx.dataset.label + ': ' + ctx.parsed.y + ' ккал';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(255,255,255,0.4)' } },
+                        x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.4)', maxTicksLimit: 20 } }
+                    }
+                }
+            });
+        }
+
+        function renderBZUChart(allData, userNames) {
+            const ctx = document.getElementById('bzuChart').getContext('2d');
+            if (bzuChart) bzuChart.destroy();
+            
+            const labels = [];
+            const proteinData = [];
+            const fatData = [];
+            const carbsData = [];
+            const fiberData = [];
+            
+            Object.keys(allData).forEach(uid => {
+                const data = allData[uid];
+                if (data && data.dates && data.dates.length > 0) {
+                    const lastIndex = data.dates.length - 1;
+                    const protein = data.protein ? data.protein[lastIndex] || 0 : 0;
+                    const fat = data.fat ? data.fat[lastIndex] || 0 : 0;
+                    const carbs = data.carbs ? data.carbs[lastIndex] || 0 : 0;
+                    const fiber = data.fiber ? data.fiber[lastIndex] || 0 : 0;
+                    
+                    if (protein > 0 || fat > 0 || carbs > 0 || fiber > 0) {
+                        labels.push(userNames[uid] || `User ${uid}`);
+                        proteinData.push(protein);
+                        fatData.push(fat);
+                        carbsData.push(carbs);
+                        fiberData.push(fiber);
+                    }
+                }
+            });
+            
+            if (labels.length === 0) {
+                labels.push('Нет данных');
+                proteinData.push(0); fatData.push(0); carbsData.push(0); fiberData.push(0);
+            }
+            
+            bzuChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: '🍗 Белки (г)', data: proteinData, backgroundColor: 'rgba(255,107,107,0.8)', borderColor: '#FF6B6B', borderWidth: 2, borderRadius: 4 },
+                        { label: '🧈 Жиры (г)', data: fatData, backgroundColor: 'rgba(255,217,61,0.8)', borderColor: '#FFD93D', borderWidth: 2, borderRadius: 4 },
+                        { label: '🍞 Углеводы (г)', data: carbsData, backgroundColor: 'rgba(107,203,119,0.8)', borderColor: '#6BCB77', borderWidth: 2, borderRadius: 4 },
+                        { label: '🥦 Клетчатка (г)', data: fiberData, backgroundColor: 'rgba(77,150,255,0.8)', borderColor: '#4D96FF', borderWidth: 2, borderRadius: 4 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: { color: 'rgba(255,255,255,0.6)', font: { size: 10 } }
+                        }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(255,255,255,0.4)' } },
+                        x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.4)' } }
+                    }
+                }
+            });
+        }
+
+        function renderExercisesChart(allData, userNames) {
+            const ctx = document.getElementById('exercisesChart').getContext('2d');
+            if (exercisesChart) exercisesChart.destroy();
+            
+            const labels = [];
+            const pushupsData = [];
+            const squatsData = [];
+            const absData = [];
+            
+            Object.keys(allData).forEach(uid => {
+                const data = allData[uid];
+                if (data && data.plan_data && data.plan_data.length > 0) {
+                    let lastData = null;
+                    for (let i = data.plan_data.length - 1; i >= 0; i--) {
+                        const plan = data.plan_data[i];
+                        if (plan && (plan.pushups || plan.squats || plan.abs)) {
+                            lastData = plan;
+                            break;
+                        }
+                    }
+                    if (lastData) {
+                        const pushups = lastData.pushups?.count || 0;
+                        const squats = lastData.squats?.count || 0;
+                        const abs = lastData.abs?.count || 0;
+                        if (pushups > 0 || squats > 0 || abs > 0) {
+                            labels.push(userNames[uid] || `User ${uid}`);
+                            pushupsData.push(pushups);
+                            squatsData.push(squats);
+                            absData.push(abs);
+                        }
+                    }
+                }
+            });
+            
+            if (labels.length === 0) {
+                labels.push('Нет данных');
+                pushupsData.push(0); squatsData.push(0); absData.push(0);
+            }
+            
+            exercisesChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: '💪 Отжимания (шт)', data: pushupsData, backgroundColor: 'rgba(255,107,107,0.8)', borderColor: '#FF6B6B', borderWidth: 2, borderRadius: 4 },
+                        { label: '🦵 Приседания (шт)', data: squatsData, backgroundColor: 'rgba(77,150,255,0.8)', borderColor: '#4D96FF', borderWidth: 2, borderRadius: 4 },
+                        { label: '🔥 Пресс (шт)', data: absData, backgroundColor: 'rgba(255,217,61,0.8)', borderColor: '#FFD93D', borderWidth: 2, borderRadius: 4 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: { color: 'rgba(255,255,255,0.6)', font: { size: 10 } }
+                        }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(255,255,255,0.4)' } },
+                        x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.4)' } }
+                    }
+                }
+            });
+        }
+
+        function renderConditionsChart(allData, userNames) {
+            const ctx = document.getElementById('conditionsChart').getContext('2d');
+            if (conditionsChart) conditionsChart.destroy();
+            
+            const labels = [];
+            const massageData = [];
+            const banyaData = [];
+            const poolData = [];
+            const noFoodData = [];
+            const gymData = [];
+            
+            Object.keys(allData).forEach(uid => {
+                const data = allData[uid];
+                if (data && data.plan_data && data.plan_data.length > 0) {
+                    let lastData = null;
+                    for (let i = data.plan_data.length - 1; i >= 0; i--) {
+                        const plan = data.plan_data[i];
+                        if (plan && (plan.massage || plan.banya || plan.pool || plan.no_food || plan.gym)) {
+                            lastData = plan;
+                            break;
+                        }
+                    }
+                    if (lastData) {
+                        const massage = lastData.massage?.done ? 1 : 0;
+                        const banya = lastData.banya?.done ? 1 : 0;
+                        const pool = lastData.pool?.done ? 1 : 0;
+                        const noFood = lastData.no_food?.done ? 1 : 0;
+                        const gym = lastData.gym?.done ? 1 : 0;
+                        if (massage + banya + pool + noFood + gym > 0) {
+                            labels.push(userNames[uid] || `User ${uid}`);
+                            massageData.push(massage);
+                            banyaData.push(banya);
+                            poolData.push(pool);
+                            noFoodData.push(noFood);
+                            gymData.push(gym);
+                        }
+                    }
+                }
+            });
+            
+            if (labels.length === 0) {
+                labels.push('Нет данных');
+                massageData.push(0); banyaData.push(0); poolData.push(0); noFoodData.push(0); gymData.push(0);
+            }
+            
+            conditionsChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: '💆 Массаж', data: massageData, backgroundColor: 'rgba(255,107,107,0.8)', borderColor: '#FF6B6B', borderWidth: 2, borderRadius: 4 },
+                        { label: '🧖 Баня', data: banyaData, backgroundColor: 'rgba(255,217,61,0.8)', borderColor: '#FFD93D', borderWidth: 2, borderRadius: 4 },
+                        { label: '🏊 Бассейн', data: poolData, backgroundColor: 'rgba(77,150,255,0.8)', borderColor: '#4D96FF', borderWidth: 2, borderRadius: 4 },
+                        { label: '⏰ Не ел после 18', data: noFoodData, backgroundColor: 'rgba(107,203,119,0.8)', borderColor: '#6BCB77', borderWidth: 2, borderRadius: 4 },
+                        { label: '🏋️ Зал', data: gymData, backgroundColor: 'rgba(162,155,254,0.8)', borderColor: '#A29BFE', borderWidth: 2, borderRadius: 4 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: { color: 'rgba(255,255,255,0.6)', font: { size: 10 } }
+                        }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, max: 1, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(255,255,255,0.4)', stepSize: 1, callback: function(value) { return value === 1 ? '✅' : '❌'; } } },
+                        x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.4)' } }
+                    }
+                }
+            });
+        }
+
+        function setPeriod(days) {
+            currentDays = days;
+            document.querySelectorAll('.period-btn').forEach(btn => {
+                btn.classList.toggle('active', parseInt(btn.dataset.period) === days);
+            });
+            loadAnalytics(days);
+        }
+
+        // ============ TABS ============
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById('tabMy').classList.add('hidden');
+            document.getElementById('tabCompare').classList.add('hidden');
+            if (tab === 'my') {
+                document.querySelector('.tab:first-child').classList.add('active');
+                document.getElementById('tabMy').classList.remove('hidden');
+            } else {
+                document.querySelector('.tab:last-child').classList.add('active');
+                document.getElementById('tabCompare').classList.remove('hidden');
+                loadAnalytics(currentDays);
+            }
+        }
+
+        // ============ TOAST ============
+        function showToast(message, type = 'info') {
+            const existing = document.querySelector('.toast');
+            if (existing) existing.remove();
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.3s';
+                setTimeout(() => toast.remove(), 300);
+            }, 2500);
+        }
+
+        // ============ AUTO-SAVE ============
+        document.querySelectorAll('#tabMy .input-group input').forEach(input => {
+            input.addEventListener('input', function() {
+                userData[this.id] = parseFloat(this.value) || 0;
+                updateStats();
+                updateProgressBars();
+                clearTimeout(saveTimeoutId);
+                saveTimeoutId = setTimeout(() => saveData(), 2000);
+            });
+        });
+
+        // ============ INIT ============
+        loadUserData();
+        setInterval(() => {
+            if (!document.getElementById('tabCompare').classList.contains('hidden')) {
+                loadAnalytics(currentDays);
+            }
+        }, 30000);
+    </script>
+</body>
+</html>
