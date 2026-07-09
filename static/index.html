@@ -23,7 +23,7 @@
             background: var(--bg);
             color: var(--text);
             padding: 20px;
-            max-width: 600px;
+            max-width: 800px;
             margin: 0 auto;
             min-height: 100vh;
             padding-bottom: 100px;
@@ -444,7 +444,8 @@
         }
         .period-btn:active { transform: scale(0.95); }
         .chart-container { height: 200px; margin-top: 12px; }
-        .chart-container-large { height: 220px; margin-top: 12px; }
+        .chart-container-large { height: 250px; margin-top: 12px; }
+        .chart-container-small { height: 180px; margin-top: 12px; }
         .comparison-table {
             width: 100%;
             font-size: 13px;
@@ -525,7 +526,7 @@
             left: 50%;
             transform: translateX(-50%);
             width: calc(100% - 40px);
-            max-width: 560px;
+            max-width: 760px;
             padding: 14px;
             background: rgba(255,255,255,0.05);
             border: 1px solid rgba(255,255,255,0.1);
@@ -545,8 +546,30 @@
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+        .user-selector {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+        .user-chip {
+            padding: 6px 14px;
+            border-radius: 20px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: var(--text-secondary);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .user-chip.active {
+            background: rgba(77,150,255,0.2);
+            border-color: #4D96FF;
+            color: white;
+        }
+        .user-chip:active { transform: scale(0.95); }
         @media (max-width: 480px) {
-            body { padding: 16px; }
+            body { padding: 16px; max-width: 100%; }
             .header h1 { font-size: 24px; }
             .card { padding: 18px; }
             .input-group { padding: 12px; }
@@ -555,6 +578,8 @@
             .stats-grid { gap: 8px; }
             .plan-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
             .plan-item { padding: 10px 12px; }
+            .chart-container-large { height: 200px; }
+            .chart-container-small { height: 150px; }
         }
     </style>
 </head>
@@ -569,7 +594,7 @@
 
     <div class="tabs">
         <button class="tab active" onclick="switchTab('my')">📝 Мои данные</button>
-        <button class="tab" onclick="switchTab('compare')">📊 Сравнение</button>
+        <button class="tab" onclick="switchTab('compare')">📊 Аналитика</button>
     </div>
 
     <div id="tabMy">
@@ -771,42 +796,57 @@
         </div>
     </div>
 
-    <!-- Tab Compare -->
+    <!-- Tab Compare - Новая аналитика -->
     <div id="tabCompare" class="hidden">
+        <!-- Выбор периода -->
         <div class="card">
-            <div class="card-title">
-                📈 Динамика калорий
-                <span class="date" id="periodLabel">за неделю</span>
-            </div>
+            <div class="card-title">📊 Аналитика</div>
             <div class="period-filter">
                 <button class="period-btn active" data-period="7" onclick="setPeriod(7)">Неделя</button>
                 <button class="period-btn" data-period="30" onclick="setPeriod(30)">Месяц</button>
                 <button class="period-btn" data-period="90" onclick="setPeriod(90)">3 мес</button>
-                <button class="period-btn" data-period="365" onclick="setPeriod(365)">Год</button>
             </div>
-            <div class="chart-container-large">
-                <canvas id="historyCaloriesChart"></canvas>
-            </div>
-        </div>
-
-        <div class="card">
-            <div class="card-title">📊 Выполнение плана</div>
-            <div class="chart-container-large">
-                <canvas id="historyPlanChart"></canvas>
+            <div class="user-selector" id="userSelector">
+                <!-- Сюда будут добавляться пользователи -->
             </div>
         </div>
 
+        <!-- График 1: Калории -->
         <div class="card">
-            <div class="card-title">👥 Участники сегодня</div>
-            <div id="comparisonContainer">
-                <div class="loading"><div class="spinner"></div><p style="margin-top:12px;">Загрузка...</p></div>
+            <div class="card-title">🔥 Динамика калорий</div>
+            <div class="chart-container-large">
+                <canvas id="caloriesChart"></canvas>
+            </div>
+        </div>
+
+        <!-- График 2: БЖУ (столбчатая) -->
+        <div class="card">
+            <div class="card-title">📊 БЖУ (белки, жиры, углеводы, клетчатка)</div>
+            <div class="chart-container-large">
+                <canvas id="bzuChart"></canvas>
+            </div>
+        </div>
+
+        <!-- График 3: Упражнения (отжимания, приседания, пресс) -->
+        <div class="card">
+            <div class="card-title">💪 Упражнения (количество)</div>
+            <div class="chart-container-large">
+                <canvas id="exercisesChart"></canvas>
+            </div>
+        </div>
+
+        <!-- График 4: Выполнение условий (галочки) -->
+        <div class="card">
+            <div class="card-title">✅ Выполнение плана (массаж, баня, бассейн, не ел после 18, зал)</div>
+            <div class="chart-container-large">
+                <canvas id="conditionsChart"></canvas>
             </div>
         </div>
     </div>
 
     <button class="tg-button" onclick="closeApp()">✖️ Закрыть</button>
 
-        <script>
+    <script>
         const API_URL = window.location.origin;
         let userId = null;
         let userName = 'Гость';
@@ -818,11 +858,16 @@
             fiber_min: 10, fiber_max: 20,
             calories_min: 2000, calories_max: 2500
         };
-        let historyCaloriesChart = null;
-        let historyPlanChart = null;
         let currentDays = 7;
-        let historyData = null;
         let saveTimeoutId = null;
+        let allUsersData = {};
+        let selectedUsers = [];
+        
+        // Charts
+        let caloriesChart = null;
+        let bzuChart = null;
+        let exercisesChart = null;
+        let conditionsChart = null;
 
         // ============ TELEGRAM ============
         const tg = window.Telegram?.WebApp;
@@ -838,14 +883,12 @@
                 console.log('👤 Пользователь из Telegram:', userId, userName);
             }
         } else {
-            // Тестовый режим - загружаем из localStorage
             const savedUserId = localStorage.getItem('bzu_user_id');
             if (savedUserId) {
                 userId = parseInt(savedUserId);
                 userName = localStorage.getItem('bzu_user_name') || 'Тест';
                 document.getElementById('userName').textContent = userName;
                 document.getElementById('userAvatar').textContent = userName[0].toUpperCase();
-                console.log('👤 Загружен пользователь из localStorage:', userId, userName);
             }
         }
 
@@ -910,17 +953,11 @@
         }
 
         async function savePlanToServer() {
-            if (!userId) {
-                console.warn('⚠️ Нет userId для сохранения плана');
-                return;
-            }
-            
+            if (!userId) return;
             try {
                 const planData = getPlanData();
                 const today = new Date().toISOString().split('T')[0];
-                console.log('💾 Сохраняем план:', planData);
-                
-                const response = await fetch('/api/plan/save', {
+                await fetch('/api/plan/save', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
@@ -930,13 +967,6 @@
                         record_date: today 
                     })
                 });
-                
-                if (response.ok) {
-                    console.log('✅ План сохранён');
-                } else {
-                    const err = await response.json();
-                    console.error('❌ Ошибка сохранения плана:', err);
-                }
             } catch (error) {
                 console.error('❌ Ошибка:', error);
             }
@@ -995,143 +1025,156 @@
             }
         });
 
-        // ============ ИСТОРИЯ ============
-        async function loadHistory(days) {
-            if (!userId) return;
+        // ============ АНАЛИТИКА ============
+        async function loadAnalytics(days) {
             try {
-                const response = await fetch(`/api/history/${userId}?days=${days}`);
-                historyData = await response.json();
-                renderHistoryCharts(historyData);
+                // Загружаем всех пользователей
+                const users = await apiCall('/api/users');
+                if (!users) return;
+                
+                // Собираем данные по каждому пользователю
+                allUsersData = {};
+                const userSelector = document.getElementById('userSelector');
+                userSelector.innerHTML = '';
+                
+                // Добавляем чекбоксы для выбора пользователей
+                users.forEach(user => {
+                    const chip = document.createElement('span');
+                    chip.className = 'user-chip';
+                    chip.dataset.userId = user.user_id;
+                    chip.textContent = user.first_name || `User ${user.user_id}`;
+                    
+                    // По умолчанию выбираем текущего пользователя и всех, у кого есть данные
+                    const isCurrent = user.user_id === userId;
+                    if (isCurrent) {
+                        chip.classList.add('active');
+                        selectedUsers.push(user.user_id);
+                    }
+                    
+                    chip.onclick = function() {
+                        this.classList.toggle('active');
+                        const id = parseInt(this.dataset.userId);
+                        const index = selectedUsers.indexOf(id);
+                        if (index > -1) {
+                            selectedUsers.splice(index, 1);
+                        } else {
+                            selectedUsers.push(id);
+                        }
+                        loadAllCharts(days);
+                    };
+                    
+                    userSelector.appendChild(chip);
+                });
+                
+                // Если никого не выбрано - выбираем текущего
+                if (selectedUsers.length === 0 && userId) {
+                    selectedUsers = [userId];
+                    document.querySelectorAll('.user-chip').forEach(el => {
+                        if (parseInt(el.dataset.userId) === userId) {
+                            el.classList.add('active');
+                        }
+                    });
+                }
+                
+                // Загружаем данные для выбранных пользователей
+                await loadAllCharts(days);
+                
             } catch (error) {
-                console.error('❌ Ошибка загрузки истории:', error);
+                console.error('❌ Ошибка загрузки аналитики:', error);
             }
         }
 
-        function renderHistoryCharts(data) {
-            const ctx1 = document.getElementById('historyCaloriesChart').getContext('2d');
-            if (historyCaloriesChart) historyCaloriesChart.destroy();
+        async function loadAllCharts(days) {
+            if (selectedUsers.length === 0) return;
             
-            if (!data || !data.dates || data.dates.length === 0) {
-                historyCaloriesChart = new Chart(ctx1, {
-                    type: 'line',
-                    data: {
-                        labels: ['Нет данных'],
-                        datasets: [{
-                            label: '🔥 Калории',
-                            data: [0],
-                            borderColor: '#4D96FF',
-                            backgroundColor: 'rgba(77,150,255,0.1)',
-                            fill: true,
-                            tension: 0.4
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: { display: false }
-                        },
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                grid: { color: 'rgba(255,255,255,0.05)' },
-                                ticks: { color: 'rgba(255,255,255,0.4)' }
-                            },
-                            x: {
-                                grid: { display: false },
-                                ticks: { color: 'rgba(255,255,255,0.4)' }
-                            }
-                        }
-                    }
-                });
-                
-                const ctx2 = document.getElementById('historyPlanChart').getContext('2d');
-                if (historyPlanChart) historyPlanChart.destroy();
-                historyPlanChart = new Chart(ctx2, {
-                    type: 'bar',
-                    data: {
-                        labels: ['Нет данных'],
-                        datasets: [
-                            {
-                                label: '✅ Выполнено',
-                                data: [0],
-                                backgroundColor: 'rgba(107,203,119,0.6)',
-                                borderColor: '#6BCB77',
-                                borderWidth: 1,
-                                borderRadius: 4,
-                                barPercentage: 0.6
-                            },
-                            {
-                                label: '📋 Всего',
-                                data: [0],
-                                backgroundColor: 'rgba(255,255,255,0.05)',
-                                borderColor: 'rgba(255,255,255,0.2)',
-                                borderWidth: 1,
-                                borderRadius: 4,
-                                barPercentage: 0.6
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                display: true,
-                                position: 'bottom',
-                                labels: {
-                                    usePointStyle: true,
-                                    padding: 12,
-                                    color: 'rgba(255,255,255,0.6)',
-                                    font: { size: 10 }
-                                }
-                            }
-                        },
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                grid: { color: 'rgba(255,255,255,0.05)' },
-                                ticks: { color: 'rgba(255,255,255,0.4)', stepSize: 1 }
-                            },
-                            x: {
-                                grid: { display: false },
-                                ticks: { color: 'rgba(255,255,255,0.4)' }
-                            }
-                        }
-                    }
-                });
-                return;
+            // Загружаем данные для всех выбранных пользователей
+            const allData = {};
+            for (const uid of selectedUsers) {
+                const history = await apiCall(`/api/history/${uid}?days=${days}`);
+                if (history) {
+                    allData[uid] = history;
+                }
             }
             
-            const labels = data.dates.map(d => {
-                const parts = d.split('-');
-                return `${parts[2]}.${parts[1]}`;
-            });
+            // Получаем имена пользователей
+            const users = await apiCall('/api/users');
+            const userNames = {};
+            if (users) {
+                users.forEach(u => {
+                    userNames[u.user_id] = u.first_name || `User ${u.user_id}`;
+                });
+            }
+            
+            renderCaloriesChart(allData, userNames);
+            renderBZUChart(allData, userNames);
+            renderExercisesChart(allData, userNames);
+            renderConditionsChart(allData, userNames);
+        }
 
-            historyCaloriesChart = new Chart(ctx1, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: '🔥 Калории',
+        function renderCaloriesChart(allData, userNames) {
+            const ctx = document.getElementById('caloriesChart').getContext('2d');
+            if (caloriesChart) caloriesChart.destroy();
+            
+            const datasets = [];
+            const colors = ['#FF6B6B', '#4D96FF', '#6BCB77', '#FFD93D', '#FF9F43', '#A29BFE', '#FD79A8', '#00CEC9'];
+            
+            let allLabels = [];
+            Object.keys(allData).forEach((uid, index) => {
+                const data = allData[uid];
+                if (data && data.dates && data.dates.length > 0) {
+                    if (allLabels.length === 0) {
+                        allLabels = data.dates.map(d => {
+                            const parts = d.split('-');
+                            return `${parts[2]}.${parts[1]}`;
+                        });
+                    }
+                    datasets.push({
+                        label: userNames[uid] || `User ${uid}`,
                         data: data.calories || [],
-                        borderColor: '#4D96FF',
-                        backgroundColor: 'rgba(77,150,255,0.1)',
+                        borderColor: colors[index % colors.length],
+                        backgroundColor: colors[index % colors.length] + '20',
                         fill: true,
                         tension: 0.4,
                         pointRadius: 3,
                         pointHoverRadius: 6
-                    }]
+                    });
+                }
+            });
+            
+            if (datasets.length === 0) {
+                datasets.push({
+                    label: 'Нет данных',
+                    data: [0],
+                    borderColor: '#666',
+                    backgroundColor: '#66620',
+                    fill: true,
+                    tension: 0.4
+                });
+                allLabels = ['Нет данных'];
+            }
+            
+            caloriesChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: allLabels,
+                    datasets: datasets
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: { display: false },
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                color: 'rgba(255,255,255,0.6)',
+                                font: { size: 10 }
+                            }
+                        },
                         tooltip: {
                             callbacks: {
                                 label: function(ctx) {
-                                    return ctx.parsed.y + ' ккал';
+                                    return ctx.dataset.label + ': ' + ctx.parsed.y + ' ккал';
                                 }
                             }
                         }
@@ -1149,31 +1192,84 @@
                     }
                 }
             });
+        }
 
-            const ctx2 = document.getElementById('historyPlanChart').getContext('2d');
-            if (historyPlanChart) historyPlanChart.destroy();
-            historyPlanChart = new Chart(ctx2, {
+        function renderBZUChart(allData, userNames) {
+            const ctx = document.getElementById('bzuChart').getContext('2d');
+            if (bzuChart) bzuChart.destroy();
+            
+            // Берем данные последнего дня для каждого пользователя
+            const labels = [];
+            const proteinData = [];
+            const fatData = [];
+            const carbsData = [];
+            const fiberData = [];
+            
+            Object.keys(allData).forEach(uid => {
+                const data = allData[uid];
+                if (data && data.dates && data.dates.length > 0) {
+                    const lastIndex = data.dates.length - 1;
+                    const record = {
+                        protein: data.protein ? data.protein[lastIndex] : 0,
+                        fat: data.fat ? data.fat[lastIndex] : 0,
+                        carbs: data.carbs ? data.carbs[lastIndex] : 0,
+                        fiber: data.fiber ? data.fiber[lastIndex] : 0
+                    };
+                    // Если есть хоть какие-то данные
+                    if (record.protein > 0 || record.fat > 0 || record.carbs > 0 || record.fiber > 0) {
+                        labels.push(userNames[uid] || `User ${uid}`);
+                        proteinData.push(record.protein || 0);
+                        fatData.push(record.fat || 0);
+                        carbsData.push(record.carbs || 0);
+                        fiberData.push(record.fiber || 0);
+                    }
+                }
+            });
+            
+            if (labels.length === 0) {
+                labels.push('Нет данных');
+                proteinData.push(0);
+                fatData.push(0);
+                carbsData.push(0);
+                fiberData.push(0);
+            }
+            
+            bzuChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels: labels,
                     datasets: [
                         {
-                            label: '✅ Выполнено',
-                            data: data.plan_completed || [],
-                            backgroundColor: 'rgba(107,203,119,0.6)',
-                            borderColor: '#6BCB77',
+                            label: '🍗 Белки',
+                            data: proteinData,
+                            backgroundColor: '#FF6B6B80',
+                            borderColor: '#FF6B6B',
                             borderWidth: 1,
-                            borderRadius: 4,
-                            barPercentage: 0.6
+                            borderRadius: 4
                         },
                         {
-                            label: '📋 Всего',
-                            data: data.plan_total || [],
-                            backgroundColor: 'rgba(255,255,255,0.05)',
-                            borderColor: 'rgba(255,255,255,0.2)',
+                            label: '🧈 Жиры',
+                            data: fatData,
+                            backgroundColor: '#FFD93D80',
+                            borderColor: '#FFD93D',
                             borderWidth: 1,
-                            borderRadius: 4,
-                            barPercentage: 0.6
+                            borderRadius: 4
+                        },
+                        {
+                            label: '🍞 Углеводы',
+                            data: carbsData,
+                            backgroundColor: '#6BCB7780',
+                            borderColor: '#6BCB77',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        },
+                        {
+                            label: '🥦 Клетчатка',
+                            data: fiberData,
+                            backgroundColor: '#4D96FF80',
+                            borderColor: '#4D96FF',
+                            borderWidth: 1,
+                            borderRadius: 4
                         }
                     ]
                 },
@@ -1183,10 +1279,8 @@
                     plugins: {
                         legend: {
                             display: true,
-                            position: 'bottom',
+                            position: 'top',
                             labels: {
-                                usePointStyle: true,
-                                padding: 12,
                                 color: 'rgba(255,255,255,0.6)',
                                 font: { size: 10 }
                             }
@@ -1196,11 +1290,232 @@
                         y: {
                             beginAtZero: true,
                             grid: { color: 'rgba(255,255,255,0.05)' },
-                            ticks: { color: 'rgba(255,255,255,0.4)', stepSize: 1 }
+                            ticks: { color: 'rgba(255,255,255,0.4)' }
                         },
                         x: {
                             grid: { display: false },
-                            ticks: { color: 'rgba(255,255,255,0.4)', maxTicksLimit: 20 }
+                            ticks: { color: 'rgba(255,255,255,0.4)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderExercisesChart(allData, userNames) {
+            const ctx = document.getElementById('exercisesChart').getContext('2d');
+            if (exercisesChart) exercisesChart.destroy();
+            
+            const labels = [];
+            const pushupsData = [];
+            const squatsData = [];
+            const absData = [];
+            
+            Object.keys(allData).forEach(uid => {
+                const data = allData[uid];
+                if (data && data.plan_data) {
+                    // Ищем последнюю запись с упражнениями
+                    let lastData = null;
+                    for (let i = data.plan_data.length - 1; i >= 0; i--) {
+                        const plan = data.plan_data[i];
+                        if (plan && (plan.pushups || plan.squats || plan.abs)) {
+                            lastData = plan;
+                            break;
+                        }
+                    }
+                    if (lastData) {
+                        labels.push(userNames[uid] || `User ${uid}`);
+                        pushupsData.push(lastData.pushups?.count || 0);
+                        squatsData.push(lastData.squats?.count || 0);
+                        absData.push(lastData.abs?.count || 0);
+                    }
+                }
+            });
+            
+            if (labels.length === 0) {
+                labels.push('Нет данных');
+                pushupsData.push(0);
+                squatsData.push(0);
+                absData.push(0);
+            }
+            
+            exercisesChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: '💪 Отжимания',
+                            data: pushupsData,
+                            backgroundColor: '#FF6B6B80',
+                            borderColor: '#FF6B6B',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        },
+                        {
+                            label: '🦵 Приседания',
+                            data: squatsData,
+                            backgroundColor: '#4D96FF80',
+                            borderColor: '#4D96FF',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        },
+                        {
+                            label: '🔥 Пресс',
+                            data: absData,
+                            backgroundColor: '#FFD93D80',
+                            borderColor: '#FFD93D',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                color: 'rgba(255,255,255,0.6)',
+                                font: { size: 10 }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: { color: 'rgba(255,255,255,0.4)' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: 'rgba(255,255,255,0.4)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderConditionsChart(allData, userNames) {
+            const ctx = document.getElementById('conditionsChart').getContext('2d');
+            if (conditionsChart) conditionsChart.destroy();
+            
+            const labels = [];
+            const massageData = [];
+            const banyaData = [];
+            const poolData = [];
+            const noFoodData = [];
+            const gymData = [];
+            
+            Object.keys(allData).forEach(uid => {
+                const data = allData[uid];
+                if (data && data.plan_data) {
+                    // Ищем последнюю запись с условиями
+                    let lastData = null;
+                    for (let i = data.plan_data.length - 1; i >= 0; i--) {
+                        const plan = data.plan_data[i];
+                        if (plan && (plan.massage || plan.banya || plan.pool || plan.no_food || plan.gym)) {
+                            lastData = plan;
+                            break;
+                        }
+                    }
+                    if (lastData) {
+                        labels.push(userNames[uid] || `User ${uid}`);
+                        massageData.push(lastData.massage?.done ? 1 : 0);
+                        banyaData.push(lastData.banya?.done ? 1 : 0);
+                        poolData.push(lastData.pool?.done ? 1 : 0);
+                        noFoodData.push(lastData.no_food?.done ? 1 : 0);
+                        gymData.push(lastData.gym?.done ? 1 : 0);
+                    }
+                }
+            });
+            
+            if (labels.length === 0) {
+                labels.push('Нет данных');
+                massageData.push(0);
+                banyaData.push(0);
+                poolData.push(0);
+                noFoodData.push(0);
+                gymData.push(0);
+            }
+            
+            conditionsChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: '💆 Массаж',
+                            data: massageData,
+                            backgroundColor: '#FF6B6B80',
+                            borderColor: '#FF6B6B',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        },
+                        {
+                            label: '🧖 Баня',
+                            data: banyaData,
+                            backgroundColor: '#FFD93D80',
+                            borderColor: '#FFD93D',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        },
+                        {
+                            label: '🏊 Бассейн',
+                            data: poolData,
+                            backgroundColor: '#4D96FF80',
+                            borderColor: '#4D96FF',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        },
+                        {
+                            label: '⏰ Не ел после 18',
+                            data: noFoodData,
+                            backgroundColor: '#6BCB7780',
+                            borderColor: '#6BCB77',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        },
+                        {
+                            label: '🏋️ Зал',
+                            data: gymData,
+                            backgroundColor: '#A29BFE80',
+                            borderColor: '#A29BFE',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                color: 'rgba(255,255,255,0.6)',
+                                font: { size: 10 }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 1,
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: { 
+                                color: 'rgba(255,255,255,0.4)',
+                                stepSize: 1,
+                                callback: function(value) {
+                                    return value === 1 ? '✅' : '❌';
+                                }
+                            }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: 'rgba(255,255,255,0.4)' }
                         }
                     }
                 }
@@ -1212,19 +1527,15 @@
             document.querySelectorAll('.period-btn').forEach(btn => {
                 btn.classList.toggle('active', parseInt(btn.dataset.period) === days);
             });
-            const labels = { 7: 'за неделю', 30: 'за месяц', 90: 'за 3 месяца', 365: 'за год' };
-            document.getElementById('periodLabel').textContent = labels[days] || 'за неделю';
-            loadHistory(days);
+            loadAnalytics(days);
         }
 
         // ============ ЗАКРЫТИЕ ============
         function closeApp() {
             console.log('🔒 Закрываем приложение...');
             
-            // Сохраняем план
             savePlanToServer();
             
-            // Сохраняем БЖУ
             const data = {
                 user_id: userId,
                 user_name: userName,
@@ -1239,24 +1550,17 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
-            }).then(() => {
-                console.log('✅ Данные сохранены при закрытии');
-            }).catch(err => {
-                console.error('❌ Ошибка при закрытии:', err);
-            });
+            }).catch(err => console.error('❌ Ошибка при закрытии:', err));
             
-            // Закрываем
             setTimeout(() => {
                 try {
                     if (tg && tg.close) {
                         tg.close();
                     } else if (window.close) {
                         window.close();
-                    } else {
-                        console.log('ℹ️ Не удалось закрыть окно');
                     }
                 } catch (e) {
-                    console.log('ℹ️ Не удалось закрыть окно:', e);
+                    console.log('ℹ️ Не удалось закрыть окно');
                 }
             }, 300);
         }
@@ -1264,30 +1568,23 @@
         // ============ БЖУ ============
         async function loadUserData() {
             if (!userId) {
-                // Если нет userId, создаем новый
                 userId = Date.now();
                 userName = 'Тест';
                 localStorage.setItem('bzu_user_id', userId);
                 localStorage.setItem('bzu_user_name', userName);
                 document.getElementById('userName').textContent = userName;
                 document.getElementById('userAvatar').textContent = 'Т';
-                console.log('👤 Создан новый тестовый пользователь:', userId);
             }
 
             try {
-                console.log('📥 Загружаем данные пользователя:', userId);
-                
                 const url = `/api/user/${userId}?first_name=${encodeURIComponent(userName)}`;
                 const data = await apiCall(url);
                 if (!data) {
-                    console.error('❌ Не удалось загрузить пользователя');
                     setTimeout(() => loadUserData(), 2000);
                     return;
                 }
 
-                console.log('✅ Данные пользователя загружены');
                 limits = data.limits;
-                
                 const record = data.today_record || {};
                 userData = {
                     protein: record.protein || 0,
@@ -1296,15 +1593,11 @@
                     fiber: record.fiber || 0,
                     calories: record.calories || 0
                 };
-                
-                console.log('📊 Загружены данные за сегодня:', userData);
 
                 const fields = ['protein', 'fat', 'carbs', 'fiber', 'calories'];
                 fields.forEach(f => {
                     const input = document.getElementById(f);
-                    if (input) {
-                        input.value = userData[f] || 0;
-                    }
+                    if (input) input.value = userData[f] || 0;
                     
                     const minEl = document.getElementById(`limit${f.charAt(0).toUpperCase() + f.slice(1)}Min`);
                     const maxEl = document.getElementById(`limit${f.charAt(0).toUpperCase() + f.slice(1)}Max`);
@@ -1322,15 +1615,11 @@
                 await loadPlanFromServer();
 
                 if (!document.getElementById('tabCompare').classList.contains('hidden')) {
-                    loadHistory(currentDays);
-                    loadComparison();
+                    loadAnalytics(currentDays);
                 }
-                
-                showToast('📂 Данные загружены', 'success');
                 
             } catch (error) {
                 console.error('❌ Ошибка загрузки:', error);
-                showToast('❌ Ошибка загрузки данных', 'error');
             }
         }
 
@@ -1408,7 +1697,6 @@
                 return;
             }
             
-            // Сохраняем в localStorage для тестового режима
             if (!tg) {
                 localStorage.setItem('bzu_user_id', userId);
                 localStorage.setItem('bzu_user_name', userName);
@@ -1423,8 +1711,6 @@
                 fiber: parseFloat(document.getElementById('fiber').value) || 0,
                 calories: parseFloat(document.getElementById('calories').value) || 0
             };
-
-            console.log('💾 Сохраняем данные:', data);
 
             try {
                 const result = await apiCall('/api/save', {
@@ -1442,9 +1728,8 @@
                     updateStats();
                     updateProgressBars();
                     showToast('✅ Сохранено!', 'success');
-                    console.log('✅ Данные сохранены');
                 } else {
-                    showToast('❌ Ошибка сохранения: ' + (result?.message || 'неизвестная ошибка'), 'error');
+                    showToast('❌ Ошибка сохранения', 'error');
                 }
             } catch (error) {
                 console.error('❌ Ошибка сохранения:', error);
@@ -1467,73 +1752,6 @@
             showToast('🔄 Сброшено', 'success');
         }
 
-        // ============ СРАВНЕНИЕ ============
-        async function loadComparison() {
-            try {
-                const data = await apiCall('/api/today');
-                if (!data) {
-                    document.getElementById('comparisonContainer').innerHTML = 
-                        '<p style="text-align:center;color:var(--text-secondary);padding:20px;">❌ Ошибка загрузки</p>';
-                    return;
-                }
-
-                const container = document.getElementById('comparisonContainer');
-                
-                // Показываем только активных пользователей
-                const activeUsers = data.filter(rec => {
-                    const total = rec.protein + rec.fat + rec.carbs + rec.fiber + rec.calories;
-                    return total > 0;
-                });
-                
-                if (activeUsers.length === 0) {
-                    container.innerHTML = '<p style="text-align:center;color:var(--text-secondary);padding:20px;">📭 Сегодня никто не ввел данные</p>';
-                    return;
-                }
-
-                let html = `<div style="overflow-x:auto;"><table class="comparison-table"><thead><tr>
-                    <th>Участник</th><th>🍗</th><th>🧈</th><th>🍞</th><th>🥦</th><th>🔥</th><th>Статус</th>
-                </tr></thead><tbody>`;
-
-                activeUsers.forEach(rec => {
-                    const name = rec.first_name || rec.username || `User ${rec.user_id}`;
-                    
-                    const getBadge = (status) => {
-                        const map = {
-                            'good': '<span class="badge good">✅</span>',
-                            'under': '<span class="badge under">⬇️</span>',
-                            'over': '<span class="badge over">⬆️</span>',
-                            'empty': '<span class="badge empty">⚪</span>'
-                        };
-                        return map[status] || map.empty;
-                    };
-                    
-                    const statusMap = {
-                        'good': '✅ Норма',
-                        'under': '⬇️ Низкий',
-                        'over': '⬆️ Высокий',
-                        'empty': '⚪ Нет'
-                    };
-                    
-                    html += `<tr>
-                        <td class="user-name">🟢 ${name}</td>
-                        <td>${rec.protein.toFixed(0)} ${getBadge(rec.protein_status)}</td>
-                        <td>${rec.fat.toFixed(0)} ${getBadge(rec.fat_status)}</td>
-                        <td>${rec.carbs.toFixed(0)} ${getBadge(rec.carbs_status)}</td>
-                        <td>${rec.fiber.toFixed(0)} ${getBadge(rec.fiber_status)}</td>
-                        <td>${rec.calories.toFixed(0)} ${getBadge(rec.calories_status)}</td>
-                        <td>${statusMap[rec.overall_status] || '⚪'}</td>
-                    </tr>`;
-                });
-
-                html += `</tbody></table></div>`;
-                container.innerHTML = html;
-            } catch (error) {
-                console.error('❌ Ошибка загрузки сравнения:', error);
-                document.getElementById('comparisonContainer').innerHTML = 
-                    '<p style="text-align:center;color:var(--text-secondary);padding:20px;">❌ Ошибка загрузки</p>';
-            }
-        }
-
         // ============ TABS ============
         function switchTab(tab) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -1545,8 +1763,7 @@
             } else {
                 document.querySelector('.tab:last-child').classList.add('active');
                 document.getElementById('tabCompare').classList.remove('hidden');
-                loadHistory(currentDays);
-                loadComparison();
+                loadAnalytics(currentDays);
             }
         }
 
@@ -1568,12 +1785,10 @@
         // ============ AUTO-SAVE ============
         document.querySelectorAll('#tabMy .input-group input').forEach(input => {
             input.addEventListener('input', function() {
-                // Обновляем userData
                 userData[this.id] = parseFloat(this.value) || 0;
                 updateStats();
                 updateProgressBars();
                 
-                // Авто-сохранение через 2 секунды после последнего изменения
                 clearTimeout(saveTimeoutId);
                 saveTimeoutId = setTimeout(() => {
                     saveData();
@@ -1584,11 +1799,9 @@
         // ============ INIT ============
         loadUserData();
         
-        // Обновляем данные каждые 30 секунд
         setInterval(() => {
             if (!document.getElementById('tabCompare').classList.contains('hidden')) {
-                loadHistory(currentDays);
-                loadComparison();
+                loadAnalytics(currentDays);
             }
         }, 30000);
     </script>
