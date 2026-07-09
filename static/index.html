@@ -871,6 +871,9 @@
 
         // ============ TELEGRAM ============
         const tg = window.Telegram?.WebApp;
+        let userId = null;
+        let userName = 'Гость';
+        
         if (tg) {
             tg.expand();
             tg.ready();
@@ -881,18 +884,39 @@
                 document.getElementById('userName').textContent = userName;
                 document.getElementById('userAvatar').textContent = userName[0].toUpperCase();
                 console.log('👤 Пользователь из Telegram:', userId, userName);
-            }
-        } else {
-            const savedUserId = localStorage.getItem('bzu_user_id');
-            if (savedUserId) {
-                userId = parseInt(savedUserId);
-                userName = localStorage.getItem('bzu_user_name') || 'Тест';
+            } else {
+                // Если Telegram есть, но пользователь не получен - пытаемся получить из localStorage
+                const savedUserId = localStorage.getItem('bzu_user_id');
+                if (savedUserId) {
+                    userId = parseInt(savedUserId);
+                    userName = localStorage.getItem('bzu_user_name') || 'Гость';
+                } else {
+                    // Создаем временного пользователя
+                    userId = Date.now();
+                    userName = 'Гость';
+                    localStorage.setItem('bzu_user_id', userId);
+                    localStorage.setItem('bzu_user_name', userName);
+                }
                 document.getElementById('userName').textContent = userName;
                 document.getElementById('userAvatar').textContent = userName[0].toUpperCase();
             }
+        } else {
+            // Если НЕ Telegram WebApp - используем localStorage
+            const savedUserId = localStorage.getItem('bzu_user_id');
+            if (savedUserId) {
+                userId = parseInt(savedUserId);
+                userName = localStorage.getItem('bzu_user_name') || 'Гость';
+            } else {
+                userId = Date.now();
+                userName = 'Гость';
+                localStorage.setItem('bzu_user_id', userId);
+                localStorage.setItem('bzu_user_name', userName);
+            }
+            document.getElementById('userName').textContent = userName;
+            document.getElementById('userAvatar').textContent = userName[0].toUpperCase();
         }
-
-        document.getElementById('currentDate').textContent = new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+        
+        console.log('👤 Итоговый пользователь:', userId, userName);
 
         // ============ API ============
         async function apiCall(url, options = {}) {
@@ -1705,23 +1729,35 @@
         // ============ БЖУ ============
         async function loadUserData() {
             if (!userId) {
+                // Если нет userId, создаем новый
                 userId = Date.now();
-                userName = 'Тест';
+                userName = 'Гость';
                 localStorage.setItem('bzu_user_id', userId);
                 localStorage.setItem('bzu_user_name', userName);
                 document.getElementById('userName').textContent = userName;
-                document.getElementById('userAvatar').textContent = 'Т';
+                document.getElementById('userAvatar').textContent = 'Г';
+                console.log('👤 Создан новый пользователь:', userId);
             }
-
+        
             try {
-                const url = `/api/user/${userId}?first_name=${encodeURIComponent(userName)}`;
+                console.log('📥 Загружаем данные пользователя:', userId, 'с именем:', userName);
+                
+                // ВАЖНО: передаем ТОЛЬКО если имя не "Гость"
+                let url = `/api/user/${userId}`;
+                if (userName && userName !== 'Гость') {
+                    url += `?first_name=${encodeURIComponent(userName)}`;
+                }
+                
                 const data = await apiCall(url);
                 if (!data) {
+                    console.error('❌ Не удалось загрузить пользователя');
                     setTimeout(() => loadUserData(), 2000);
                     return;
                 }
-
+        
+                console.log('✅ Данные пользователя загружены:', data);
                 limits = data.limits;
+                
                 const record = data.today_record || {};
                 userData = {
                     protein: record.protein || 0,
@@ -1730,11 +1766,23 @@
                     fiber: record.fiber || 0,
                     calories: record.calories || 0
                 };
-
+                
+                console.log('📊 Загружены данные за сегодня:', userData);
+        
+                // Обновляем имя пользователя из базы, если оно отличается
+                if (data.user && data.user.first_name && data.user.first_name !== userName) {
+                    userName = data.user.first_name;
+                    document.getElementById('userName').textContent = userName;
+                    document.getElementById('userAvatar').textContent = userName[0].toUpperCase();
+                    localStorage.setItem('bzu_user_name', userName);
+                }
+        
                 const fields = ['protein', 'fat', 'carbs', 'fiber', 'calories'];
                 fields.forEach(f => {
                     const input = document.getElementById(f);
-                    if (input) input.value = userData[f] || 0;
+                    if (input) {
+                        input.value = userData[f] || 0;
+                    }
                     
                     const minEl = document.getElementById(`limit${f.charAt(0).toUpperCase() + f.slice(1)}Min`);
                     const maxEl = document.getElementById(`limit${f.charAt(0).toUpperCase() + f.slice(1)}Max`);
@@ -1746,17 +1794,23 @@
                     if (minLabel) minLabel.textContent = limits[`${f}_min`] || 0;
                     if (maxLabel) maxLabel.textContent = limits[`${f}_max`] || 0;
                 });
-
+        
                 updateStats();
                 updateProgressBars();
                 await loadPlanFromServer();
-
+        
                 if (!document.getElementById('tabCompare').classList.contains('hidden')) {
-                    loadAnalytics(currentDays);
+                    loadHistory(currentDays);
+                    loadComparison();
+                }
+                
+                if (userName !== 'Гость') {
+                    showToast(`👋 Привет, ${userName}!`, 'success');
                 }
                 
             } catch (error) {
                 console.error('❌ Ошибка загрузки:', error);
+                showToast('❌ Ошибка загрузки данных', 'error');
             }
         }
 
@@ -1834,27 +1888,30 @@
                 return;
             }
             
-            if (!tg) {
-                localStorage.setItem('bzu_user_id', userId);
+            // Сохраняем в localStorage
+            localStorage.setItem('bzu_user_id', userId);
+            if (userName && userName !== 'Гость') {
                 localStorage.setItem('bzu_user_name', userName);
             }
             
             const data = {
                 user_id: userId,
-                user_name: userName,
+                user_name: userName !== 'Гость' ? userName : null, // Не передаем "Гость"
                 protein: parseFloat(document.getElementById('protein').value) || 0,
                 fat: parseFloat(document.getElementById('fat').value) || 0,
                 carbs: parseFloat(document.getElementById('carbs').value) || 0,
                 fiber: parseFloat(document.getElementById('fiber').value) || 0,
                 calories: parseFloat(document.getElementById('calories').value) || 0
             };
-
+        
+            console.log('💾 Сохраняем данные:', data);
+        
             try {
                 const result = await apiCall('/api/save', {
                     method: 'POST',
                     body: JSON.stringify(data)
                 });
-
+        
                 if (result && result.status === 'success') {
                     userData.protein = data.protein;
                     userData.fat = data.fat;
@@ -1865,8 +1922,9 @@
                     updateStats();
                     updateProgressBars();
                     showToast('✅ Сохранено!', 'success');
+                    console.log('✅ Данные сохранены');
                 } else {
-                    showToast('❌ Ошибка сохранения', 'error');
+                    showToast('❌ Ошибка сохранения: ' + (result?.message || 'неизвестная ошибка'), 'error');
                 }
             } catch (error) {
                 console.error('❌ Ошибка сохранения:', error);
