@@ -233,7 +233,7 @@ async def get_history(user_id: int, days: int = 90):
         completed_items = 0
         for v in plan_data.values():
             if isinstance(v, dict):
-                if v.get('done', False) or v.get('count, 0) > 0:
+                if v.get('done', False) or v.get('count', 0) > 0:  # <-- ИСПРАВЛЕНО!
                     completed_items += 1
             elif v:
                 completed_items += 1 if v else 0
