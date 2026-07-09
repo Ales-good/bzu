@@ -6,31 +6,18 @@
     <title>БЖУ Дневник</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        /* ============ ОБЩИЕ СТИЛИ ============ */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         :root {
             --bg: #0F0F1A;
-            --card: rgba(255, 255, 255, 0.05);
-            --card-border: rgba(255, 255, 255, 0.08);
+            --card: rgba(255,255,255,0.05);
+            --card-border: rgba(255,255,255,0.08);
             --text: #FFFFFF;
-            --text-secondary: rgba(255, 255, 255, 0.6);
-            --shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            --text-secondary: rgba(255,255,255,0.6);
+            --shadow: 0 8px 32px rgba(0,0,0,0.4);
             --radius: 20px;
-            --glass: rgba(255, 255, 255, 0.03);
-            
-            --protein: #FF6B6B;
-            --fat: #FFD93D;
-            --carbs: #6BCB77;
-            --fiber: #4D96FF;
-            
+            --glass: rgba(255,255,255,0.03);
             --gradient-main: linear-gradient(135deg, #FF6B6B, #FFD93D, #6BCB77, #4D96FF);
         }
-        
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: var(--bg);
@@ -42,7 +29,6 @@
             padding-bottom: 100px;
             position: relative;
         }
-        
         body::before {
             content: '';
             position: fixed;
@@ -50,19 +36,16 @@
             left: -50%;
             width: 200%;
             height: 200%;
-            background: radial-gradient(ellipse at 30% 20%, rgba(255, 107, 107, 0.08), transparent 50%),
-                        radial-gradient(ellipse at 70% 80%, rgba(77, 150, 255, 0.08), transparent 50%);
+            background: radial-gradient(ellipse at 30% 20%, rgba(255,107,107,0.08), transparent 50%),
+                        radial-gradient(ellipse at 70% 80%, rgba(77,150,255,0.08), transparent 50%);
             z-index: -1;
             animation: backgroundFloat 20s ease-in-out infinite;
         }
-        
         @keyframes backgroundFloat {
-            0%, 100% { transform: translate(0, 0) rotate(0deg); }
-            33% { transform: translate(2%, 2%) rotate(1deg); }
-            66% { transform: translate(-2%, 1%) rotate(-1deg); }
+            0%,100% { transform: translate(0,0) rotate(0deg); }
+            33% { transform: translate(2%,2%) rotate(1deg); }
+            66% { transform: translate(-2%,1%) rotate(-1deg); }
         }
-        
-        /* ============ HEADER ============ */
         .header {
             display: flex;
             justify-content: space-between;
@@ -70,7 +53,6 @@
             padding: 16px 0 24px 0;
             position: relative;
         }
-        
         .header::after {
             content: '';
             position: absolute;
@@ -80,7 +62,6 @@
             height: 1px;
             background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
         }
-        
         .header h1 {
             font-size: 28px;
             font-weight: 700;
@@ -90,7 +71,6 @@
             background-clip: text;
             letter-spacing: -0.5px;
         }
-        
         .user-badge {
             display: flex;
             align-items: center;
@@ -102,7 +82,6 @@
             border: 1px solid var(--card-border);
             box-shadow: var(--shadow);
         }
-        
         .user-badge .avatar {
             width: 36px;
             height: 36px;
@@ -114,17 +93,14 @@
             font-weight: 700;
             font-size: 16px;
             color: white;
-            box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
+            box-shadow: 0 4px 12px rgba(255,107,107,0.3);
         }
-        
         .user-badge .name {
             font-size: 14px;
             font-weight: 500;
             color: var(--text);
             -webkit-text-fill-color: var(--text);
         }
-        
-        /* ============ TABS ============ */
         .tabs {
             display: flex;
             gap: 8px;
@@ -135,7 +111,6 @@
             border-radius: 16px;
             border: 1px solid var(--card-border);
         }
-        
         .tab {
             flex: 1;
             padding: 12px;
@@ -147,16 +122,14 @@
             font-weight: 600;
             color: var(--text-secondary);
             cursor: pointer;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.4s cubic-bezier(0.4,0,0.2,1);
             position: relative;
         }
-        
         .tab.active {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255,255,255,0.1);
             color: white;
-            box-shadow: 0 4px 20px rgba(255, 107, 107, 0.15);
+            box-shadow: 0 4px 20px rgba(255,107,107,0.15);
         }
-        
         .tab.active::before {
             content: '';
             position: absolute;
@@ -168,12 +141,7 @@
             -webkit-mask-composite: xor;
             mask-composite: exclude;
         }
-        
-        .tab:active {
-            transform: scale(0.95);
-        }
-        
-        /* ============ CARDS ============ */
+        .tab:active { transform: scale(0.95); }
         .card {
             background: var(--card);
             backdrop-filter: blur(20px);
@@ -182,11 +150,10 @@
             margin-bottom: 16px;
             border: 1px solid var(--card-border);
             box-shadow: var(--shadow);
-            animation: cardSlide 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            animation: cardSlide 0.5s cubic-bezier(0.4,0,0.2,1);
             position: relative;
             overflow: hidden;
         }
-        
         .card::before {
             content: '';
             position: absolute;
@@ -197,18 +164,10 @@
             background: var(--gradient-main);
             opacity: 0.5;
         }
-        
         @keyframes cardSlide {
-            from {
-                opacity: 0;
-                transform: translateY(30px) scale(0.98);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0) scale(1);
-            }
+            from { opacity: 0; transform: translateY(30px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
         }
-        
         .card-title {
             font-size: 16px;
             font-weight: 600;
@@ -218,42 +177,36 @@
             gap: 10px;
             color: var(--text);
         }
-        
         .card-title .date {
             font-size: 13px;
             font-weight: 400;
             color: var(--text-secondary);
             margin-left: auto;
         }
-
         .card-title .badge-done {
             font-size: 12px;
-            background: rgba(107, 203, 119, 0.2);
+            background: rgba(107,203,119,0.2);
             color: #6BCB77;
             padding: 2px 12px;
             border-radius: 12px;
             font-weight: 500;
         }
-
         .card-title .badge-pending {
             font-size: 12px;
-            background: rgba(255, 107, 107, 0.2);
+            background: rgba(255,107,107,0.2);
             color: #FF6B6B;
             padding: 2px 12px;
             border-radius: 12px;
             font-weight: 500;
         }
-        
-        /* ============ ПЛАН ВЫПОЛНЕНИЯ ============ */
         .plan-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 10px;
         }
-
         .plan-item {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.06);
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06);
             border-radius: 14px;
             padding: 12px 14px;
             display: flex;
@@ -263,193 +216,31 @@
             cursor: pointer;
             user-select: none;
         }
-
-        .plan-item:active {
-            transform: scale(0.96);
-        }
-
-        .plan-item .icon {
-            font-size: 20px;
-            width: 32px;
-            text-align: center;
-        }
-
-        .plan-item .info {
-            flex: 1;
-        }
-
-        .plan-item .label {
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--text);
-        }
-
-        .plan-item .count {
-            font-size: 12px;
-            color: var(--text-secondary);
-        }
-
-        .plan-item .status {
-            font-size: 18px;
-            transition: all 0.3s ease;
-        }
-
+        .plan-item:active { transform: scale(0.96); }
+        .plan-item .icon { font-size: 20px; width: 32px; text-align: center; }
+        .plan-item .info { flex: 1; }
+        .plan-item .label { font-size: 13px; font-weight: 500; color: var(--text); }
+        .plan-item .status { font-size: 18px; transition: all 0.3s ease; }
         .plan-item.done {
-            border-color: rgba(107, 203, 119, 0.3);
-            background: rgba(107, 203, 119, 0.08);
+            border-color: rgba(107,203,119,0.3);
+            background: rgba(107,203,119,0.08);
         }
-
-        .plan-item.done .status {
-            color: #6BCB77;
-        }
-
-        .plan-item.pending .status {
-            color: var(--text-secondary);
-        }
-
+        .plan-item.done .status { color: #6BCB77; }
+        .plan-item.pending .status { color: var(--text-secondary); }
         .plan-item .input-count {
             width: 50px;
             padding: 4px 6px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
             border-radius: 8px;
             color: var(--text);
             font-size: 14px;
             text-align: center;
             outline: none;
         }
+        .plan-item .input-count:focus { border-color: rgba(255,255,255,0.3); }
+        .plan-item .input-count::placeholder { color: var(--text-secondary); font-size: 11px; }
 
-        .plan-item .input-count:focus {
-            border-color: rgba(255, 255, 255, 0.3);
-        }
-
-        .plan-item .input-count::placeholder {
-            color: var(--text-secondary);
-            font-size: 11px;
-        }
-        
-        /* ============ СТАТИСТИКА ПЛАНА ============ */
-        .plan-stats-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr 1fr;
-            gap: 8px;
-            margin-bottom: 16px;
-        }
-        
-        .plan-stat-item {
-            background: rgba(255, 255, 255, 0.03);
-            border-radius: 12px;
-            padding: 10px 8px;
-            text-align: center;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-        }
-        
-        .plan-stat-item .num {
-            font-size: 20px;
-            font-weight: 700;
-        }
-        
-        .plan-stat-item .num.green { color: #6BCB77; }
-        .plan-stat-item .num.yellow { color: #FFD93D; }
-        .plan-stat-item .num.red { color: #FF6B6B; }
-        
-        .plan-stat-item .lbl {
-            font-size: 10px;
-            color: var(--text-secondary);
-            margin-top: 2px;
-        }
-        
-        .period-filter {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 16px;
-        }
-        
-        .period-btn {
-            flex: 1;
-            padding: 8px;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.06);
-            border-radius: 10px;
-            color: var(--text-secondary);
-            font-size: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-align: center;
-        }
-        
-        .period-btn.active {
-            background: rgba(255, 255, 255, 0.08);
-            border-color: rgba(255, 255, 255, 0.15);
-            color: white;
-        }
-        
-        .period-btn:active {
-            transform: scale(0.95);
-        }
-        
-        .plan-history {
-            max-height: 300px;
-            overflow-y: auto;
-        }
-        
-        .plan-history::-webkit-scrollbar {
-            width: 3px;
-        }
-        
-        .plan-history::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
-        }
-        
-        .history-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-        }
-        
-        .history-item:last-child {
-            border-bottom: none;
-        }
-        
-        .history-item .h-date {
-            font-size: 12px;
-            color: var(--text-secondary);
-            min-width: 60px;
-        }
-        
-        .history-item .h-details {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-            justify-content: flex-end;
-        }
-        
-        .history-item .h-detail {
-            font-size: 12px;
-            display: flex;
-            align-items: center;
-            gap: 3px;
-        }
-        
-        .history-item .h-detail.done { color: #6BCB77; }
-        .history-item .h-detail.pending { color: var(--text-secondary); }
-        
-        .history-item .h-total {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--text);
-            min-width: 30px;
-            text-align: right;
-        }
-        
-        .history-item .h-total.good { color: #6BCB77; }
-        .history-item .h-total.bad { color: #FF6B6B; }
-        
-        /* ============ INPUT GROUPS ============ */
         .input-group {
             margin-bottom: 20px;
             padding: 16px;
@@ -458,16 +249,11 @@
             border: 1px solid var(--card-border);
             transition: all 0.3s ease;
         }
-        
         .input-group:focus-within {
-            border-color: rgba(255, 255, 255, 0.2);
-            box-shadow: 0 0 30px rgba(255, 107, 107, 0.05);
+            border-color: rgba(255,255,255,0.2);
+            box-shadow: 0 0 30px rgba(255,107,107,0.05);
         }
-        
-        .input-group:last-child {
-            margin-bottom: 0;
-        }
-        
+        .input-group:last-child { margin-bottom: 0; }
         .input-group label {
             display: flex;
             justify-content: space-between;
@@ -476,37 +262,26 @@
             font-weight: 600;
             margin-bottom: 8px;
         }
-        
-        .input-group .emoji {
-            font-size: 20px;
-            margin-right: 8px;
-        }
-        
+        .input-group .emoji { font-size: 20px; margin-right: 8px; }
         .input-group .range-label {
             font-size: 12px;
             font-weight: 400;
             color: var(--text-secondary);
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(255,255,255,0.05);
             padding: 2px 12px;
             border-radius: 12px;
         }
-        
-        .input-group .range-label span {
-            font-weight: 600;
-            color: var(--text);
-        }
-        
+        .input-group .range-label span { font-weight: 600; color: var(--text); }
         .input-wrapper {
             display: flex;
             align-items: center;
             gap: 12px;
         }
-        
         .input-wrapper input {
             flex: 1;
             padding: 12px 16px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
             border-radius: 12px;
             font-size: 20px;
             font-weight: 600;
@@ -514,43 +289,37 @@
             transition: all 0.3s ease;
             outline: none;
         }
-        
         .input-wrapper input:focus {
-            background: rgba(255, 255, 255, 0.08);
-            border-color: rgba(255, 255, 255, 0.2);
-            box-shadow: 0 0 20px rgba(255, 107, 107, 0.05);
+            background: rgba(255,255,255,0.08);
+            border-color: rgba(255,255,255,0.2);
+            box-shadow: 0 0 20px rgba(255,107,107,0.05);
         }
-        
         .input-wrapper input::placeholder {
             color: var(--text-secondary);
             font-weight: 400;
             font-size: 16px;
         }
-        
         .input-wrapper .unit {
             color: var(--text-secondary);
             font-size: 14px;
             font-weight: 500;
             min-width: 20px;
         }
-        
         .progress-container {
             margin-top: 10px;
             height: 6px;
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(255,255,255,0.05);
             border-radius: 10px;
             overflow: hidden;
             position: relative;
         }
-        
         .progress-fill {
             height: 100%;
             border-radius: 10px;
-            transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease;
+            transition: width 0.8s cubic-bezier(0.4,0,0.2,1), background 0.3s ease;
             width: 0%;
             position: relative;
         }
-        
         .progress-fill::after {
             content: '';
             position: absolute;
@@ -558,10 +327,9 @@
             top: 0;
             height: 100%;
             width: 20px;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3));
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3));
             border-radius: 10px;
         }
-        
         .range-status {
             display: flex;
             justify-content: space-between;
@@ -570,21 +338,17 @@
             font-size: 11px;
             color: var(--text-secondary);
         }
-        
         .range-status .status-badge {
             padding: 2px 12px;
             border-radius: 12px;
             font-weight: 600;
             font-size: 11px;
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(255,255,255,0.05);
         }
-        
-        .range-status .status-badge.good { color: #6BCB77; background: rgba(107, 203, 119, 0.15); }
-        .range-status .status-badge.under { color: #FFD93D; background: rgba(255, 217, 61, 0.15); }
-        .range-status .status-badge.over { color: #FF6B6B; background: rgba(255, 107, 107, 0.15); }
-        .range-status .status-badge.empty { color: var(--text-secondary); background: rgba(255, 255, 255, 0.05); }
-        
-        /* ============ BUTTONS ============ */
+        .range-status .status-badge.good { color: #6BCB77; background: rgba(107,203,119,0.15); }
+        .range-status .status-badge.under { color: #FFD93D; background: rgba(255,217,61,0.15); }
+        .range-status .status-badge.over { color: #FF6B6B; background: rgba(255,107,107,0.15); }
+        .range-status .status-badge.empty { color: var(--text-secondary); background: rgba(255,255,255,0.05); }
         .btn-primary {
             width: 100%;
             padding: 16px;
@@ -600,30 +364,21 @@
             position: relative;
             overflow: hidden;
         }
-        
         .btn-primary::before {
             content: '';
             position: absolute;
             inset: 0;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
             transform: translateX(-100%);
             transition: transform 0.6s ease;
         }
-        
-        .btn-primary:hover::before {
-            transform: translateX(100%);
-        }
-        
-        .btn-primary:active {
-            transform: scale(0.97);
-        }
-        
+        .btn-primary:active { transform: scale(0.97); }
         .btn-secondary {
             width: 100%;
             padding: 14px;
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(255,255,255,0.05);
             color: var(--text-secondary);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255,255,255,0.1);
             border-radius: 14px;
             font-size: 14px;
             font-weight: 600;
@@ -631,33 +386,25 @@
             transition: all 0.3s ease;
             margin-top: 8px;
         }
-        
         .btn-secondary:active {
             transform: scale(0.97);
-            background: rgba(255, 255, 255, 0.08);
+            background: rgba(255,255,255,0.08);
         }
-        
-        /* ============ STATS GRID ============ */
+
         .stats-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1fr 1fr 1fr;
             gap: 12px;
             margin-top: 12px;
         }
-        
         .stat-item {
-            background: rgba(255, 255, 255, 0.03);
+            background: rgba(255,255,255,0.03);
             padding: 16px;
             border-radius: 14px;
             text-align: center;
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255,255,255,0.05);
             transition: all 0.3s ease;
         }
-        
-        .stat-item:hover {
-            background: rgba(255, 255, 255, 0.06);
-        }
-        
         .stat-item .value {
             font-size: 28px;
             font-weight: 700;
@@ -666,31 +413,55 @@
             -webkit-text-fill-color: transparent;
             background-clip: text;
         }
-        
         .stat-item .label {
             font-size: 12px;
             color: var(--text-secondary);
             margin-top: 4px;
         }
-        
         .stat-item .status {
             font-size: 11px;
             margin-top: 4px;
             font-weight: 500;
         }
-        
         .stat-item .status.good { color: #6BCB77; }
         .stat-item .status.warn { color: #FFD93D; }
         .stat-item .status.over { color: #FF6B6B; }
         .stat-item .status.empty { color: var(--text-secondary); }
-        
-        /* ============ COMPARISON TABLE ============ */
+
+        .period-filter {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .period-btn {
+            flex: 1;
+            min-width: 60px;
+            padding: 8px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 10px;
+            color: var(--text-secondary);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+        .period-btn.active {
+            background: rgba(255,255,255,0.08);
+            border-color: rgba(255,255,255,0.15);
+            color: white;
+        }
+        .period-btn:active { transform: scale(0.95); }
+        .chart-container { height: 200px; margin-top: 12px; }
+        .chart-container-large { height: 220px; margin-top: 12px; }
+
         .comparison-table {
             width: 100%;
             font-size: 13px;
             border-collapse: collapse;
         }
-        
         .comparison-table th {
             text-align: left;
             padding: 10px 6px;
@@ -699,22 +470,14 @@
             font-size: 11px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
         }
-        
         .comparison-table td {
             padding: 10px 6px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            border-bottom: 1px solid rgba(255,255,255,0.03);
         }
-        
-        .comparison-table tr:last-child td {
-            border-bottom: none;
-        }
-        
-        .comparison-table .user-name {
-            font-weight: 600;
-        }
-        
+        .comparison-table tr:last-child td { border-bottom: none; }
+        .comparison-table .user-name { font-weight: 600; }
         .comparison-table .badge {
             display: inline-block;
             padding: 2px 10px;
@@ -723,86 +486,55 @@
             font-weight: 700;
             margin-left: 4px;
         }
-        
-        .badge.good { background: rgba(107, 203, 119, 0.15); color: #6BCB77; }
-        .badge.under { background: rgba(255, 217, 61, 0.15); color: #FFD93D; }
-        .badge.over { background: rgba(255, 107, 107, 0.15); color: #FF6B6B; }
-        .badge.empty { background: rgba(255, 255, 255, 0.05); color: var(--text-secondary); }
-        
-        /* ============ CHART ============ */
-        .chart-container {
-            height: 220px;
-            margin-top: 12px;
-            position: relative;
-        }
-        
-        .chart-container-small {
-            height: 160px;
-            margin-top: 8px;
-        }
-        
-        /* ============ LOADING ============ */
+        .badge.good { background: rgba(107,203,119,0.15); color: #6BCB77; }
+        .badge.under { background: rgba(255,217,61,0.15); color: #FFD93D; }
+        .badge.over { background: rgba(255,107,107,0.15); color: #FF6B6B; }
+        .badge.empty { background: rgba(255,255,255,0.05); color: var(--text-secondary); }
+
         .loading {
             text-align: center;
             padding: 40px 20px;
             color: var(--text-secondary);
         }
-        
         .loading .spinner {
             display: inline-block;
             width: 40px;
             height: 40px;
-            border: 3px solid rgba(255, 255, 255, 0.05);
+            border: 3px solid rgba(255,255,255,0.05);
             border-top-color: #FF6B6B;
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
         }
-        
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        
-        /* ============ HIDDEN ============ */
-        .hidden {
-            display: none !important;
-        }
-        
-        /* ============ TOAST ============ */
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .hidden { display: none !important; }
+
         .toast {
             position: fixed;
             bottom: 80px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255,255,255,0.1);
             backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255,255,255,0.1);
             padding: 14px 28px;
             border-radius: 16px;
             font-size: 14px;
             font-weight: 500;
             color: white;
-            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4);
-            animation: toastSlide 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+            animation: toastSlide 0.4s cubic-bezier(0.4,0,0.2,1);
             z-index: 1000;
             max-width: 90%;
             text-align: center;
         }
-        
-        .toast.success { border-color: rgba(107, 203, 119, 0.3); }
-        .toast.error { border-color: rgba(255, 107, 107, 0.3); }
-        
+        .toast.success { border-color: rgba(107,203,119,0.3); }
+        .toast.error { border-color: rgba(255,107,107,0.3); }
         @keyframes toastSlide {
-            from {
-                opacity: 0;
-                transform: translateX(-50%) translateY(20px) scale(0.95);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(-50%) translateY(0) scale(1);
-            }
+            from { opacity: 0; transform: translateX(-50%) translateY(20px) scale(0.95); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
         }
-        
-        /* ============ TG BUTTON ============ */
+
         .tg-button {
             position: fixed;
             bottom: 20px;
@@ -811,8 +543,8 @@
             width: calc(100% - 40px);
             max-width: 560px;
             padding: 14px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
             border-radius: 14px;
             color: var(--text-secondary);
             font-size: 14px;
@@ -822,27 +554,14 @@
             backdrop-filter: blur(20px);
             text-align: center;
         }
-        
         .tg-button:active {
             transform: translateX(-50%) scale(0.97);
-            background: rgba(255, 255, 255, 0.08);
+            background: rgba(255,255,255,0.08);
         }
-        
-        /* ============ SCROLLBAR ============ */
-        ::-webkit-scrollbar {
-            width: 4px;
-        }
-        
-        ::-webkit-scrollbar-track {
-            background: transparent;
-        }
-        
-        ::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
-        }
-        
-        /* ============ RESPONSIVE ============ */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+
         @media (max-width: 480px) {
             body { padding: 16px; }
             .header h1 { font-size: 24px; }
@@ -853,16 +572,10 @@
             .stats-grid { gap: 8px; }
             .plan-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
             .plan-item { padding: 10px 12px; }
-            .plan-stats-grid { grid-template-columns: 1fr 1fr 1fr 1fr; gap: 4px; }
-            .plan-stat-item { padding: 8px 4px; }
-            .plan-stat-item .num { font-size: 16px; }
-            .period-filter { gap: 4px; }
-            .period-btn { font-size: 10px; padding: 6px; }
         }
     </style>
 </head>
 <body>
-    <!-- ===== HEADER ===== -->
     <div class="header">
         <h1>🍽️ БЖУ</h1>
         <div class="user-badge">
@@ -870,56 +583,40 @@
             <span class="name" id="userName">Гость</span>
         </div>
     </div>
-    
-    <!-- ===== TABS ===== -->
+
     <div class="tabs">
         <button class="tab active" onclick="switchTab('my')">📝 Мои данные</button>
         <button class="tab" onclick="switchTab('compare')">📊 Сравнение</button>
     </div>
-    
-    <!-- ===== TAB: MY DATA ===== -->
+
     <div id="tabMy">
-        
-        <!-- БЛОК: ПЛАН ВЫПОЛНЕНИЯ -->
+        <!-- План -->
         <div class="card">
             <div class="card-title">
                 🏆 План выполнения
                 <span class="badge-pending" id="planProgress">0/8</span>
             </div>
-            
-            <div class="plan-grid" id="planGrid">
+            <div class="plan-grid">
                 <div class="plan-item pending" data-id="massage" onclick="togglePlan(this)">
                     <span class="icon">💆</span>
-                    <div class="info">
-                        <div class="label">Массаж</div>
-                    </div>
+                    <div class="info"><div class="label">Массаж</div></div>
                     <span class="status">◻️</span>
                 </div>
-                
                 <div class="plan-item pending" data-id="banya" onclick="togglePlan(this)">
                     <span class="icon">🧖</span>
-                    <div class="info">
-                        <div class="label">Баня</div>
-                    </div>
+                    <div class="info"><div class="label">Баня</div></div>
                     <span class="status">◻️</span>
                 </div>
-                
                 <div class="plan-item pending" data-id="pool" onclick="togglePlan(this)">
                     <span class="icon">🏊</span>
-                    <div class="info">
-                        <div class="label">Бассейн</div>
-                    </div>
+                    <div class="info"><div class="label">Бассейн</div></div>
                     <span class="status">◻️</span>
                 </div>
-                
                 <div class="plan-item pending" data-id="no_food" onclick="togglePlan(this)">
                     <span class="icon">⏰</span>
-                    <div class="info">
-                        <div class="label">Не ел после 18</div>
-                    </div>
+                    <div class="info"><div class="label">Не ел после 18</div></div>
                     <span class="status">◻️</span>
                 </div>
-                
                 <div class="plan-item pending" data-id="pushups">
                     <span class="icon">💪</span>
                     <div class="info">
@@ -928,7 +625,6 @@
                     </div>
                     <span class="status">◻️</span>
                 </div>
-                
                 <div class="plan-item pending" data-id="squats">
                     <span class="icon">🦵</span>
                     <div class="info">
@@ -937,7 +633,6 @@
                     </div>
                     <span class="status">◻️</span>
                 </div>
-                
                 <div class="plan-item pending" data-id="abs">
                     <span class="icon">🔥</span>
                     <div class="info">
@@ -946,24 +641,21 @@
                     </div>
                     <span class="status">◻️</span>
                 </div>
-                
                 <div class="plan-item pending" data-id="gym" onclick="togglePlan(this)">
                     <span class="icon">🏋️</span>
-                    <div class="info">
-                        <div class="label">Зал (силовые)</div>
-                    </div>
+                    <div class="info"><div class="label">Зал (силовые)</div></div>
                     <span class="status">◻️</span>
                 </div>
             </div>
         </div>
-        
-        <!-- БЛОК КБЖУ -->
+
+        <!-- БЖУ -->
         <div class="card">
             <div class="card-title">
                 📅 Сегодня
                 <span class="date" id="currentDate"></span>
             </div>
-            
+
             <div class="input-group">
                 <label>
                     <span><span class="emoji">🍗</span> Белки</span>
@@ -982,7 +674,7 @@
                     <span>⬆️ <span id="proteinMaxLabel">200</span>г</span>
                 </div>
             </div>
-            
+
             <div class="input-group">
                 <label>
                     <span><span class="emoji">🧈</span> Жиры</span>
@@ -1001,7 +693,7 @@
                     <span>⬆️ <span id="fatMaxLabel">80</span>г</span>
                 </div>
             </div>
-            
+
             <div class="input-group">
                 <label>
                     <span><span class="emoji">🍞</span> Углеводы</span>
@@ -1020,7 +712,7 @@
                     <span>⬆️ <span id="carbsMaxLabel">100</span>г</span>
                 </div>
             </div>
-            
+
             <div class="input-group">
                 <label>
                     <span><span class="emoji">🥦</span> Клетчатка</span>
@@ -1039,12 +731,31 @@
                     <span>⬆️ <span id="fiberMaxLabel">20</span>г</span>
                 </div>
             </div>
-            
+
+            <div class="input-group">
+                <label>
+                    <span><span class="emoji">🔥</span> Калории</span>
+                    <span class="range-label">норма <span id="limitCaloriesMin">2000</span>–<span id="limitCaloriesMax">2500</span>ккал</span>
+                </label>
+                <div class="input-wrapper">
+                    <input type="number" id="calories" placeholder="0" min="0" step="1">
+                    <span class="unit">ккал</span>
+                </div>
+                <div class="progress-container">
+                    <div class="progress-fill" id="caloriesProgress"></div>
+                </div>
+                <div class="range-status">
+                    <span>⬇️ <span id="caloriesMinLabel">2000</span>ккал</span>
+                    <span class="status-badge empty" id="caloriesStatusText">⚪ Не введено</span>
+                    <span>⬆️ <span id="caloriesMaxLabel">2500</span>ккал</span>
+                </div>
+            </div>
+
             <button class="btn-primary" onclick="saveData()">💾 Сохранить</button>
             <button class="btn-secondary" onclick="resetToday()">🔄 Сбросить</button>
         </div>
-        
-        <!-- STATS -->
+
+        <!-- Stats -->
         <div class="card">
             <div class="card-title">📊 Итог</div>
             <div class="stats-grid">
@@ -1068,504 +779,619 @@
                     <div class="label">🥦 Клетчатка</div>
                     <div class="status empty" id="statusFiber">⚪</div>
                 </div>
+                <div class="stat-item">
+                    <div class="value" id="statCalories">0</div>
+                    <div class="label">🔥 Калории</div>
+                    <div class="status empty" id="statusCalories">⚪</div>
+                </div>
             </div>
         </div>
     </div>
-    
-    <!-- ===== TAB: COMPARE ===== -->
+
+    <!-- Tab Compare -->
     <div id="tabCompare" class="hidden">
-        
-        <!-- ===== СТАТИСТИКА ПЛАНА ===== -->
         <div class="card">
             <div class="card-title">
-                📊 Статистика плана
-                <span class="date" id="planPeriodLabel">за сегодня</span>
+                📈 Динамика
+                <span class="date" id="periodLabel">за неделю</span>
             </div>
-            
-            <!-- Фильтр периодов -->
             <div class="period-filter">
-                <button class="period-btn active" data-period="day" onclick="setPeriod('day')">День</button>
-                <button class="period-btn" data-period="week" onclick="setPeriod('week')">Неделя</button>
-                <button class="period-btn" data-period="month" onclick="setPeriod('month')">Месяц</button>
-                <button class="period-btn" data-period="all" onclick="setPeriod('all')">Всё</button>
+                <button class="period-btn active" data-period="7" onclick="setPeriod(7)">Неделя</button>
+                <button class="period-btn" data-period="30" onclick="setPeriod(30)">Месяц</button>
+                <button class="period-btn" data-period="90" onclick="setPeriod(90)">3 мес</button>
+                <button class="period-btn" data-period="365" onclick="setPeriod(365)">Год</button>
             </div>
-            
-            <!-- Статистика -->
-            <div class="plan-stats-grid">
-                <div class="plan-stat-item">
-                    <div class="num green" id="planTotalDone">0</div>
-                    <div class="lbl">✅ Выполнено</div>
-                </div>
-                <div class="plan-stat-item">
-                    <div class="num yellow" id="planTotalItems">0</div>
-                    <div class="lbl">📋 Всего пунктов</div>
-                </div>
-                <div class="plan-stat-item">
-                    <div class="num" id="planPercent" style="color:#4D96FF;">0%</div>
-                    <div class="lbl">🎯 Процент</div>
-                </div>
-                <div class="plan-stat-item">
-                    <div class="num red" id="planStreak">0</div>
-                    <div class="lbl">🔥 Дней подряд</div>
-                </div>
+            <div class="chart-container-large">
+                <canvas id="historyCaloriesChart"></canvas>
             </div>
-            
-            <!-- График выполнения по дням -->
-            <div class="chart-container-small">
-                <canvas id="planChart"></canvas>
-            </div>
+            <div style="margin-top:16px;text-align:center;font-size:12px;color:var(--text-secondary);">🔥 Калории (ккал) за период</div>
         </div>
-        
-        <!-- История выполнения -->
+
         <div class="card">
-            <div class="card-title">📜 История</div>
-            <div class="plan-history" id="planHistory">
-                <div class="loading">
-                    <div class="spinner"></div>
-                    <p style="margin-top:12px;">Загрузка...</p>
-                </div>
+            <div class="card-title">📊 Выполнение плана</div>
+            <div class="chart-container-large">
+                <canvas id="historyPlanChart"></canvas>
             </div>
+            <div style="margin-top:16px;text-align:center;font-size:12px;color:var(--text-secondary);">✅ Выполненные пункты плана за период</div>
         </div>
-        
-        <!-- БЖУ сравнение -->
+
         <div class="card">
-            <div class="card-title">👥 Участники (БЖУ)</div>
+            <div class="card-title">👥 Участники сегодня</div>
             <div id="comparisonContainer">
-                <div class="loading">
-                    <div class="spinner"></div>
-                    <p style="margin-top: 12px;">Загрузка...</p>
-                </div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <div class="card-title">📈 Сравнение БЖУ</div>
-            <div class="chart-container">
-                <canvas id="compareChart"></canvas>
+                <div class="loading"><div class="spinner"></div><p style="margin-top:12px;">Загрузка...</p></div>
             </div>
         </div>
     </div>
-    
-    <!-- ===== CLOSE BUTTON ===== -->
+
     <button class="tg-button" onclick="closeApp()">✖️ Закрыть</button>
-    
+
     <script>
-    // ============ CONFIG ============
-    const API_URL = window.location.origin;
-    let userId = null;
-    let userData = { protein: 0, fat: 0, carbs: 0, fiber: 0 };
-    let limits = {
-        protein_min: 150, protein_max: 200,
-        fat_min: 70, fat_max: 80,
-        carbs_min: 80, carbs_max: 100,
-        fiber_min: 10, fiber_max: 20
-    };
-    let compareChart = null;
-    let planChart = null;
-    let currentPeriod = 'day';
-    let allPlanHistory = [];
-    
-    const PLAN_ITEMS = [
-        { id: 'massage', icon: '💆', label: 'Массаж' },
-        { id: 'banya', icon: '🧖', label: 'Баня' },
-        { id: 'pool', icon: '🏊', label: 'Бассейн' },
-        { id: 'no_food', icon: '⏰', label: 'Не ел после 18' },
-        { id: 'pushups', icon: '💪', label: 'Отжимания' },
-        { id: 'squats', icon: '🦵', label: 'Приседания' },
-        { id: 'abs', icon: '🔥', label: 'Пресс' },
-        { id: 'gym', icon: '🏋️', label: 'Зал (силовые)' }
-    ];
-    
-    // ============ TELEGRAM ============
-    const tg = window.Telegram?.WebApp;
-    if (tg) {
-        tg.expand();
-        tg.ready();
-        const user = tg.initDataUnsafe?.user;
-        if (user) {
-            userId = user.id;
-            document.getElementById('userName').textContent = user.first_name || 'Гость';
-            document.getElementById('userAvatar').textContent = (user.first_name || 'Г')[0].toUpperCase();
-        }
-    }
-    
-    // ============ DATE ============
-    document.getElementById('currentDate').textContent = new Date().toLocaleDateString('ru-RU', {
-        day: 'numeric', month: 'long'
-    });
-    
-    // ============ API ============
-    async function apiCall(url, options = {}) {
-        try {
-            const response = await fetch(url, {
-                ...options,
-                headers: { 'Content-Type': 'application/json', ...options.headers }
-            });
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            return await response.json();
-        } catch (error) {
-            console.error('API Error:', error);
-            return null;
-        }
-    }
-    
-    // ============ ФУНКЦИИ ПЛАНА ============
-    function getPlanData() {
-        const items = document.querySelectorAll('.plan-item');
-        const data = {};
-        items.forEach(el => {
-            const id = el.dataset.id;
-            const isDone = el.classList.contains('done');
-            const input = el.querySelector('.input-count');
-            const count = input ? parseInt(input.value) || 0 : 0;
-            data[id] = { done: isDone, count: count };
-        });
-        return data;
-    }
-    
-    function updatePlanProgress() {
-        const items = document.querySelectorAll('.plan-item');
-        const done = document.querySelectorAll('.plan-item.done');
-        const total = items.length;
-        const count = done.length;
-        const badge = document.getElementById('planProgress');
-        badge.textContent = `${count}/${total}`;
-        badge.className = count === total ? 'badge-done' : 'badge-pending';
-    }
-    
-    function togglePlan(el) {
-        const isDone = el.classList.contains('done');
-        if (isDone) {
-            el.classList.remove('done');
-            el.classList.add('pending');
-            el.querySelector('.status').textContent = '◻️';
-        } else {
-            el.classList.remove('pending');
-            el.classList.add('done');
-            el.querySelector('.status').textContent = '✅';
-        }
-        updatePlanProgress();
-        savePlanToServer();
-    }
-    
-    // ============ СОХРАНЕНИЕ ПЛАНА НА СЕРВЕР ============
-    async function savePlanToServer() {
-        if (!userId) return;
-        const planData = getPlanData();
-        const today = new Date().toISOString().split('T')[0];
-        
-        console.log('📤 Сохраняем план на сервер:', planData);
-        
-        try {
-            const response = await fetch('/api/plan/save', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    user_id: userId,
-                    plan_data: planData,
-                    record_date: today
-                })
-            });
-            const result = await response.json();
-            if (response.ok) {
-                console.log('✅ План сохранён на сервер');
-            } else {
-                console.error('❌ Ошибка сохранения плана:', result);
-            }
-        } catch (error) {
-            console.error('❌ Ошибка:', error);
-        }
-    }
-    
-    // ============ ЗАГРУЗКА ПЛАНА С СЕРВЕРА ============
-    async function loadPlanFromServer() {
-        if (!userId) return false;
-        
-        try {
-            const response = await fetch(`/api/plan/get/${userId}`);
-            const data = await response.json();
-            
-            if (data.plan && Object.keys(data.plan).length > 0) {
-                const plan = data.plan;
-                document.querySelectorAll('.plan-item').forEach(el => {
-                    const id = el.dataset.id;
-                    if (plan[id]) {
-                        if (plan[id].done) {
-                            el.classList.remove('pending');
-                            el.classList.add('done');
-                            el.querySelector('.status').textContent = '✅';
-                        } else {
-                            el.classList.remove('done');
-                            el.classList.add('pending');
-                            el.querySelector('.status').textContent = '◻️';
-                        }
-                        const input = el.querySelector('.input-count');
-                        if (input && plan[id].count) {
-                            input.value = plan[id].count;
-                        }
-                    }
-                });
-                updatePlanProgress();
-                console.log('✅ План загружен с сервера');
-                return true;
-            }
-            return false;
-        } catch (error) {
-            console.error('❌ Ошибка загрузки плана:', error);
-            return false;
-        }
-    }
-    
-    // ============ ЗАКРЫТИЕ ПРИЛОЖЕНИЯ ============
-    function closeApp() {
-        console.log('🔒 Закрываем приложение...');
-        
-        // Сохраняем план
-        savePlanToServer();
-        
-        // Сохраняем БЖУ
-        const data = {
-            user_id: userId,
-            protein: parseFloat(document.getElementById('protein').value) || 0,
-            fat: parseFloat(document.getElementById('fat').value) || 0,
-            carbs: parseFloat(document.getElementById('carbs').value) || 0,
-            fiber: parseFloat(document.getElementById('fiber').value) || 0
+        const API_URL = window.location.origin;
+        let userId = null;
+        let userData = { protein: 0, fat: 0, carbs: 0, fiber: 0, calories: 0 };
+        let limits = {
+            protein_min: 150, protein_max: 200,
+            fat_min: 70, fat_max: 80,
+            carbs_min: 80, carbs_max: 100,
+            fiber_min: 10, fiber_max: 20,
+            calories_min: 2000, calories_max: 2500
         };
-        
-        fetch('/api/save', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        }).catch(() => {});
-        
-        // Закрываем Telegram WebApp
+        let compareChart = null;
+        let historyCaloriesChart = null;
+        let historyPlanChart = null;
+        let currentDays = 7;
+        let historyData = null;
+
+        const PLAN_ITEMS = [
+            { id: 'massage', icon: '💆', label: 'Массаж' },
+            { id: 'banya', icon: '🧖', label: 'Баня' },
+            { id: 'pool', icon: '🏊', label: 'Бассейн' },
+            { id: 'no_food', icon: '⏰', label: 'Не ел после 18' },
+            { id: 'pushups', icon: '💪', label: 'Отжимания' },
+            { id: 'squats', icon: '🦵', label: 'Приседания' },
+            { id: 'abs', icon: '🔥', label: 'Пресс' },
+            { id: 'gym', icon: '🏋️', label: 'Зал (силовые)' }
+        ];
+
+        // Telegram
+        const tg = window.Telegram?.WebApp;
         if (tg) {
-            tg.close();
-        } else {
-            window.close();
+            tg.expand();
+            tg.ready();
+            const user = tg.initDataUnsafe?.user;
+            if (user) {
+                userId = user.id;
+                document.getElementById('userName').textContent = user.first_name || 'Гость';
+                document.getElementById('userAvatar').textContent = (user.first_name || 'Г')[0].toUpperCase();
+            }
         }
-    }
-    
-    // ============ ОБРАБОТЧИК ВВОДА ДЛЯ ПЛАНА ============
-    document.addEventListener('input', function(e) {
-        if (e.target.classList.contains('input-count')) {
-            const el = e.target.closest('.plan-item');
-            const val = parseInt(e.target.value);
-            if (val > 0) {
-                el.classList.remove('pending');
-                el.classList.add('done');
-                el.querySelector('.status').textContent = '✅';
-            } else {
+
+        document.getElementById('currentDate').textContent = new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+
+        // ============ API ============
+        async function apiCall(url, options = {}) {
+            try {
+                const response = await fetch(url, {
+                    ...options,
+                    headers: { 'Content-Type': 'application/json', ...options.headers }
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return await response.json();
+            } catch (error) {
+                console.error('API Error:', error);
+                return null;
+            }
+        }
+
+        // ============ ПЛАН ============
+        function getPlanData() {
+            const items = document.querySelectorAll('.plan-item');
+            const data = {};
+            items.forEach(el => {
+                const id = el.dataset.id;
+                const isDone = el.classList.contains('done');
+                const input = el.querySelector('.input-count');
+                const count = input ? parseInt(input.value) || 0 : 0;
+                data[id] = { done: isDone, count: count };
+            });
+            return data;
+        }
+
+        function updatePlanProgress() {
+            const items = document.querySelectorAll('.plan-item');
+            const done = document.querySelectorAll('.plan-item.done');
+            const total = items.length;
+            const count = done.length;
+            const badge = document.getElementById('planProgress');
+            badge.textContent = `${count}/${total}`;
+            badge.className = count === total ? 'badge-done' : 'badge-pending';
+        }
+
+        function togglePlan(el) {
+            const isDone = el.classList.contains('done');
+            if (isDone) {
                 el.classList.remove('done');
                 el.classList.add('pending');
                 el.querySelector('.status').textContent = '◻️';
+            } else {
+                el.classList.remove('pending');
+                el.classList.add('done');
+                el.querySelector('.status').textContent = '✅';
             }
             updatePlanProgress();
             savePlanToServer();
         }
-    });
-    
-    // ============ ЗАГРУЗКА ПОЛЬЗОВАТЕЛЯ ============
-    async function loadUserData() {
-        if (!userId) {
-            userId = Date.now();
-            document.getElementById('userName').textContent = 'Тест';
-            document.getElementById('userAvatar').textContent = 'Т';
+
+        async function savePlanToServer() {
+            if (!userId) return;
+            const planData = getPlanData();
+            const today = new Date().toISOString().split('T')[0];
+            try {
+                await fetch('/api/plan/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: userId, plan_data: planData, record_date: today })
+                });
+                console.log('✅ План сохранён');
+            } catch (error) {
+                console.error('❌ Ошибка сохранения плана:', error);
+            }
         }
-        
-        try {
-            const data = await apiCall(`/api/user/${userId}`);
-            if (!data) return;
-            
-            limits = data.limits;
-            const record = data.today_record || {};
-            userData = {
-                protein: record.protein || 0,
-                fat: record.fat || 0,
-                carbs: record.carbs || 0,
-                fiber: record.fiber || 0
-            };
-            
-            const fields = ['protein', 'fat', 'carbs', 'fiber'];
-            fields.forEach(f => {
-                document.getElementById(f).value = userData[f];
-                document.getElementById(`limit${f.charAt(0).toUpperCase() + f.slice(1)}Min`).textContent = limits[`${f}_min`];
-                document.getElementById(`limit${f.charAt(0).toUpperCase() + f.slice(1)}Max`).textContent = limits[`${f}_max`];
-                document.getElementById(`${f}MinLabel`).textContent = limits[`${f}_min`];
-                document.getElementById(`${f}MaxLabel`).textContent = limits[`${f}_max`];
+
+        async function loadPlanFromServer() {
+            if (!userId) return false;
+            try {
+                const response = await fetch(`/api/plan/get/${userId}`);
+                const data = await response.json();
+                if (data.plan && Object.keys(data.plan).length > 0) {
+                    const plan = data.plan;
+                    document.querySelectorAll('.plan-item').forEach(el => {
+                        const id = el.dataset.id;
+                        if (plan[id]) {
+                            if (plan[id].done) {
+                                el.classList.remove('pending');
+                                el.classList.add('done');
+                                el.querySelector('.status').textContent = '✅';
+                            } else {
+                                el.classList.remove('done');
+                                el.classList.add('pending');
+                                el.querySelector('.status').textContent = '◻️';
+                            }
+                            const input = el.querySelector('.input-count');
+                            if (input && plan[id].count) {
+                                input.value = plan[id].count;
+                            }
+                        }
+                    });
+                    updatePlanProgress();
+                    return true;
+                }
+                return false;
+            } catch (error) {
+                console.error('❌ Ошибка загрузки плана:', error);
+                return false;
+            }
+        }
+
+        document.addEventListener('input', function(e) {
+            if (e.target.classList.contains('input-count')) {
+                const el = e.target.closest('.plan-item');
+                const val = parseInt(e.target.value);
+                if (val > 0) {
+                    el.classList.remove('pending');
+                    el.classList.add('done');
+                    el.querySelector('.status').textContent = '✅';
+                } else {
+                    el.classList.remove('done');
+                    el.classList.add('pending');
+                    el.querySelector('.status').textContent = '◻️';
+                }
+                updatePlanProgress();
+                savePlanToServer();
+            }
+        });
+
+        // ============ ИСТОРИЯ ============
+        async function loadHistory(days) {
+            if (!userId) return;
+            try {
+                const response = await fetch(`/api/history/${userId}?days=${days}`);
+                historyData = await response.json();
+                renderHistoryCharts(historyData);
+            } catch (error) {
+                console.error('❌ Ошибка загрузки истории:', error);
+            }
+        }
+
+        function renderHistoryCharts(data) {
+            const labels = data.dates.map(d => {
+                const parts = d.split('-');
+                return `${parts[2]}.${parts[1]}`;
             });
-            
-            updateStats();
-            updateProgressBars();
-            
-            // Загружаем план с сервера
-            await loadPlanFromServer();
-            
-        } catch (error) {
-            console.error('❌ Ошибка:', error);
+
+            // График калорий
+            const ctx1 = document.getElementById('historyCaloriesChart').getContext('2d');
+            if (historyCaloriesChart) historyCaloriesChart.destroy();
+            historyCaloriesChart = new Chart(ctx1, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '🔥 Калории',
+                        data: data.calories,
+                        borderColor: '#4D96FF',
+                        backgroundColor: 'rgba(77,150,255,0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 3,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(ctx) {
+                                    return ctx.parsed.y + ' ккал';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: { color: 'rgba(255,255,255,0.4)' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: 'rgba(255,255,255,0.4)', maxTicksLimit: 20 }
+                        }
+                    }
+                }
+            });
+
+            // График выполнения плана
+            const ctx2 = document.getElementById('historyPlanChart').getContext('2d');
+            if (historyPlanChart) historyPlanChart.destroy();
+            historyPlanChart = new Chart(ctx2, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: '✅ Выполнено',
+                            data: data.plan_completed,
+                            backgroundColor: 'rgba(107,203,119,0.6)',
+                            borderColor: '#6BCB77',
+                            borderWidth: 1,
+                            borderRadius: 4,
+                            barPercentage: 0.6
+                        },
+                        {
+                            label: '📋 Всего',
+                            data: data.plan_total,
+                            backgroundColor: 'rgba(255,255,255,0.05)',
+                            borderColor: 'rgba(255,255,255,0.2)',
+                            borderWidth: 1,
+                            borderRadius: 4,
+                            barPercentage: 0.6
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'bottom',
+                            labels: {
+                                usePointStyle: true,
+                                padding: 12,
+                                color: 'rgba(255,255,255,0.6)',
+                                font: { size: 10 }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(255,255,255,0.05)' },
+                            ticks: { color: 'rgba(255,255,255,0.4)', stepSize: 1 }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: 'rgba(255,255,255,0.4)', maxTicksLimit: 20 }
+                        }
+                    }
+                }
+            });
         }
-    }
-    
-    // ============ UPDATE STATS ============
-    function updateStats() {
-        const fields = ['protein', 'fat', 'carbs', 'fiber'];
-        fields.forEach(f => {
-            const value = userData[f] || 0;
-            const min = limits[`${f}_min`] || 0;
-            const max = limits[`${f}_max`] || 1;
-            
-            document.getElementById(`stat${f.charAt(0).toUpperCase() + f.slice(1)}`).textContent = value;
-            
-            let statusText, statusClass;
-            if (value === 0) {
-                statusText = '⚪';
-                statusClass = 'empty';
-            } else if (value < min) {
-                statusText = '⬇️';
-                statusClass = 'warn';
-            } else if (value > max) {
-                statusText = '⬆️';
-                statusClass = 'over';
-            } else {
-                statusText = '✅';
-                statusClass = 'good';
-            }
-            
-            const el = document.getElementById(`status${f.charAt(0).toUpperCase() + f.slice(1)}`);
-            el.textContent = statusText;
-            el.className = `status ${statusClass}`;
-            
-            const statusBadge = document.getElementById(`${f}StatusText`);
-            const statusLabels = {
-                'good': '✅ Норма',
-                'under': '⬇️ Ниже',
-                'over': '⬆️ Выше',
-                'empty': '⚪ Не введено'
+
+        function setPeriod(days) {
+            currentDays = days;
+            document.querySelectorAll('.period-btn').forEach(btn => {
+                btn.classList.toggle('active', parseInt(btn.dataset.period) === days);
+            });
+            const labels = { 7: 'за неделю', 30: 'за месяц', 90: 'за 3 месяца', 365: 'за год' };
+            document.getElementById('periodLabel').textContent = labels[days] || 'за неделю';
+            loadHistory(days);
+        }
+
+        // ============ ЗАКРЫТИЕ ============
+        function closeApp() {
+            console.log('🔒 Закрываем приложение...');
+            savePlanToServer();
+            const data = {
+                user_id: userId,
+                protein: parseFloat(document.getElementById('protein').value) || 0,
+                fat: parseFloat(document.getElementById('fat').value) || 0,
+                carbs: parseFloat(document.getElementById('carbs').value) || 0,
+                fiber: parseFloat(document.getElementById('fiber').value) || 0,
+                calories: parseFloat(document.getElementById('calories').value) || 0
             };
-            statusBadge.textContent = statusLabels[statusClass] || statusLabels.empty;
-            statusBadge.className = `status-badge ${statusClass}`;
-        });
-    }
-    
-    function updateProgressBars() {
-        const fields = ['protein', 'fat', 'carbs', 'fiber'];
-        const colors = ['#FF6B6B', '#FFD93D', '#6BCB77', '#4D96FF'];
-        fields.forEach((f, i) => {
-            const value = userData[f] || 0;
-            const max = limits[`${f}_max`] || 1;
-            const min = limits[`${f}_min`] || 0;
-            const percent = Math.min((value / max) * 100, 100);
-            const bar = document.getElementById(`${f}Progress`);
-            bar.style.width = `${percent}%`;
-            if (value === 0) {
-                bar.style.background = 'rgba(255,255,255,0.1)';
-            } else if (value < min) {
-                bar.style.background = '#FFD93D';
-            } else if (value > max) {
-                bar.style.background = '#FF6B6B';
+            fetch('/api/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            }).catch(() => {});
+            if (tg) {
+                tg.close();
             } else {
-                bar.style.background = colors[i];
+                window.close();
             }
-        });
-    }
-    
-    // ============ СОХРАНЕНИЕ БЖУ ============
-    async function saveData() {
-        const data = {
-            user_id: userId,
-            protein: parseFloat(document.getElementById('protein').value) || 0,
-            fat: parseFloat(document.getElementById('fat').value) || 0,
-            carbs: parseFloat(document.getElementById('carbs').value) || 0,
-            fiber: parseFloat(document.getElementById('fiber').value) || 0
-        };
-        
-        const result = await apiCall('/api/save', {
-            method: 'POST',
-            body: JSON.stringify(data)
-        });
-        
-        if (result && result.status === 'success') {
-            userData = data;
-            updateStats();
-            updateProgressBars();
-            console.log('✅ БЖУ сохранено');
         }
-    }
-    
-    // ============ ВВОД БЖУ ============
-    document.querySelectorAll('#tabMy .input-group input').forEach(input => {
-        input.addEventListener('change', function() {
-            userData[this.id] = parseFloat(this.value) || 0;
-            updateStats();
-            updateProgressBars();
-        });
-    });
-    
-    // ============ СРАВНЕНИЕ ============
-    async function loadComparison() {
-        const data = await apiCall('/api/today');
-        if (!data) return;
-        
-        const container = document.getElementById('comparisonContainer');
-        if (data.length === 0) {
-            container.innerHTML = '<p style="text-align:center;color:var(--text-secondary);padding:20px;">📭 Нет данных</p>';
-            return;
-        }
-        
-        let html = `<div style="overflow-x:auto;"><table class="comparison-table"><thead><tr>
-            <th>Участник</th><th>🍗</th><th>🧈</th><th>🍞</th><th>🥦</th><th>Статус</th>
-        </tr></thead><tbody>`;
-        
-        data.forEach(rec => {
-            const name = rec.first_name || rec.username || `User ${rec.user_id}`;
-            const total = rec.protein + rec.fat + rec.carbs + rec.fiber;
-            const isActive = total > 0;
-            const getBadge = (status) => {
-                const map = {
-                    'good': '<span class="badge good">✅</span>',
-                    'under': '<span class="badge under">⬇️</span>',
-                    'over': '<span class="badge over">⬆️</span>',
-                    'empty': '<span class="badge empty">⚪</span>'
+
+        // ============ БЖУ ============
+        async function loadUserData() {
+            if (!userId) {
+                userId = Date.now();
+                document.getElementById('userName').textContent = 'Тест';
+                document.getElementById('userAvatar').textContent = 'Т';
+            }
+
+            try {
+                const data = await apiCall(`/api/user/${userId}`);
+                if (!data) return;
+
+                limits = data.limits;
+                const record = data.today_record || {};
+                userData = {
+                    protein: record.protein || 0,
+                    fat: record.fat || 0,
+                    carbs: record.carbs || 0,
+                    fiber: record.fiber || 0,
+                    calories: record.calories || 0
                 };
-                return map[status] || map.empty;
-            };
-            const statusMap = {
-                'good': '✅ Норма',
-                'under': '⬇️ Низкий',
-                'over': '⬆️ Высокий',
-                'empty': '⚪ Нет'
-            };
-            html += `<tr>
-                <td class="user-name">${isActive ? '🟢' : '⚪'} ${name}</td>
-                <td>${rec.protein.toFixed(0)} ${getBadge(rec.protein_status)}</td>
-                <td>${rec.fat.toFixed(0)} ${getBadge(rec.fat_status)}</td>
-                <td>${rec.carbs.toFixed(0)} ${getBadge(rec.carbs_status)}</td>
-                <td>${rec.fiber.toFixed(0)} ${getBadge(rec.fiber_status)}</td>
-                <td>${statusMap[rec.overall_status] || '⚪'}</td>
-            </tr>`;
-        });
-        
-        html += `</tbody></table></div>`;
-        container.innerHTML = html;
-    }
-    
-    // ============ TABS ============
-    function switchTab(tab) {
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        document.getElementById('tabMy').classList.add('hidden');
-        document.getElementById('tabCompare').classList.add('hidden');
-        if (tab === 'my') {
-            document.querySelector('.tab:first-child').classList.add('active');
-            document.getElementById('tabMy').classList.remove('hidden');
-        } else {
-            document.querySelector('.tab:last-child').classList.add('active');
-            document.getElementById('tabCompare').classList.remove('hidden');
-            loadComparison();
+
+                const fields = ['protein', 'fat', 'carbs', 'fiber', 'calories'];
+                fields.forEach(f => {
+                    document.getElementById(f).value = userData[f] || 0;
+                    document.getElementById(`limit${f.charAt(0).toUpperCase() + f.slice(1)}Min`).textContent = limits[`${f}_min`] || 0;
+                    document.getElementById(`limit${f.charAt(0).toUpperCase() + f.slice(1)}Max`).textContent = limits[`${f}_max`] || 0;
+                    document.getElementById(`${f}MinLabel`).textContent = limits[`${f}_min`] || 0;
+                    document.getElementById(`${f}MaxLabel`).textContent = limits[`${f}_max`] || 0;
+                });
+
+                updateStats();
+                updateProgressBars();
+                await loadPlanFromServer();
+
+                // Загружаем историю для графиков
+                if (!document.getElementById('tabCompare').classList.contains('hidden')) {
+                    loadHistory(currentDays);
+                    loadComparison();
+                }
+            } catch (error) {
+                console.error('❌ Ошибка:', error);
+            }
         }
-    }
-    
-    // ============ ЗАПУСК ============
-    loadUserData();
-</script>
+
+        function updateStats() {
+            const fields = ['protein', 'fat', 'carbs', 'fiber', 'calories'];
+            fields.forEach(f => {
+                const value = userData[f] || 0;
+                const min = limits[`${f}_min`] || 0;
+                const max = limits[`${f}_max`] || 1;
+
+                document.getElementById(`stat${f.charAt(0).toUpperCase() + f.slice(1)}`).textContent = value;
+
+                let statusText, statusClass;
+                if (value === 0) {
+                    statusText = '⚪';
+                    statusClass = 'empty';
+                } else if (value < min) {
+                    statusText = '⬇️';
+                    statusClass = 'warn';
+                } else if (value > max) {
+                    statusText = '⬆️';
+                    statusClass = 'over';
+                } else {
+                    statusText = '✅';
+                    statusClass = 'good';
+                }
+
+                const el = document.getElementById(`status${f.charAt(0).toUpperCase() + f.slice(1)}`);
+                if (el) {
+                    el.textContent = statusText;
+                    el.className = `status ${statusClass}`;
+                }
+
+                const statusBadge = document.getElementById(`${f}StatusText`);
+                if (statusBadge) {
+                    const statusLabels = {
+                        'good': '✅ Норма',
+                        'under': '⬇️ Ниже',
+                        'over': '⬆️ Выше',
+                        'empty': '⚪ Не введено'
+                    };
+                    statusBadge.textContent = statusLabels[statusClass] || statusLabels.empty;
+                    statusBadge.className = `status-badge ${statusClass}`;
+                }
+            });
+        }
+
+        function updateProgressBars() {
+            const fields = ['protein', 'fat', 'carbs', 'fiber', 'calories'];
+            const colors = ['#FF6B6B', '#FFD93D', '#6BCB77', '#4D96FF', '#FF6B6B'];
+            fields.forEach((f, i) => {
+                const value = userData[f] || 0;
+                const max = limits[`${f}_max`] || 1;
+                const min = limits[`${f}_min`] || 0;
+                const percent = Math.min((value / max) * 100, 100);
+                const bar = document.getElementById(`${f}Progress`);
+                if (bar) {
+                    bar.style.width = `${percent}%`;
+                    if (value === 0) {
+                        bar.style.background = 'rgba(255,255,255,0.1)';
+                    } else if (value < min) {
+                        bar.style.background = '#FFD93D';
+                    } else if (value > max) {
+                        bar.style.background = '#FF6B6B';
+                    } else {
+                        bar.style.background = colors[i] || '#4D96FF';
+                    }
+                }
+            });
+        }
+
+        async function saveData() {
+            const data = {
+                user_id: userId,
+                protein: parseFloat(document.getElementById('protein').value) || 0,
+                fat: parseFloat(document.getElementById('fat').value) || 0,
+                carbs: parseFloat(document.getElementById('carbs').value) || 0,
+                fiber: parseFloat(document.getElementById('fiber').value) || 0,
+                calories: parseFloat(document.getElementById('calories').value) || 0
+            };
+
+            const result = await apiCall('/api/save', {
+                method: 'POST',
+                body: JSON.stringify(data)
+            });
+
+            if (result && result.status === 'success') {
+                userData = data;
+                updateStats();
+                updateProgressBars();
+                showToast('✅ Сохранено!', 'success');
+            } else {
+                showToast('❌ Ошибка сохранения', 'error');
+            }
+        }
+
+        async function resetToday() {
+            if (!confirm('Сбросить данные за сегодня?')) return;
+            const data = { user_id: userId, protein: 0, fat: 0, carbs: 0, fiber: 0, calories: 0 };
+            await apiCall('/api/save', { method: 'POST', body: JSON.stringify(data) });
+            userData = data;
+            ['protein', 'fat', 'carbs', 'fiber', 'calories'].forEach(f => document.getElementById(f).value = 0);
+            updateStats();
+            updateProgressBars();
+            showToast('🔄 Сброшено', 'success');
+        }
+
+        // ============ СРАВНЕНИЕ ============
+        async function loadComparison() {
+            const data = await apiCall('/api/today');
+            if (!data) return;
+
+            const container = document.getElementById('comparisonContainer');
+            if (data.length === 0) {
+                container.innerHTML = '<p style="text-align:center;color:var(--text-secondary);padding:20px;">📭 Нет данных</p>';
+                return;
+            }
+
+            let html = `<div style="overflow-x:auto;"><table class="comparison-table"><thead><tr>
+                <th>Участник</th><th>🍗</th><th>🧈</th><th>🍞</th><th>🥦</th><th>🔥</th><th>Статус</th>
+            </tr></thead><tbody>`;
+
+            data.forEach(rec => {
+                const name = rec.first_name || rec.username || `User ${rec.user_id}`;
+                const total = rec.protein + rec.fat + rec.carbs + rec.fiber + rec.calories;
+                const isActive = total > 0;
+                const getBadge = (status) => {
+                    const map = {
+                        'good': '<span class="badge good">✅</span>',
+                        'under': '<span class="badge under">⬇️</span>',
+                        'over': '<span class="badge over">⬆️</span>',
+                        'empty': '<span class="badge empty">⚪</span>'
+                    };
+                    return map[status] || map.empty;
+                };
+                const statusMap = {
+                    'good': '✅ Норма',
+                    'under': '⬇️ Низкий',
+                    'over': '⬆️ Высокий',
+                    'empty': '⚪ Нет'
+                };
+                html += `<tr>
+                    <td class="user-name">${isActive ? '🟢' : '⚪'} ${name}</td>
+                    <td>${rec.protein.toFixed(0)} ${getBadge(rec.protein_status)}</td>
+                    <td>${rec.fat.toFixed(0)} ${getBadge(rec.fat_status)}</td>
+                    <td>${rec.carbs.toFixed(0)} ${getBadge(rec.carbs_status)}</td>
+                    <td>${rec.fiber.toFixed(0)} ${getBadge(rec.fiber_status)}</td>
+                    <td>${rec.calories.toFixed(0)} ${getBadge(rec.calories_status)}</td>
+                    <td>${statusMap[rec.overall_status] || '⚪'}</td>
+                </tr>`;
+            });
+
+            html += `</tbody></table></div>`;
+            container.innerHTML = html;
+        }
+
+        // ============ TABS ============
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById('tabMy').classList.add('hidden');
+            document.getElementById('tabCompare').classList.add('hidden');
+            if (tab === 'my') {
+                document.querySelector('.tab:first-child').classList.add('active');
+                document.getElementById('tabMy').classList.remove('hidden');
+            } else {
+                document.querySelector('.tab:last-child').classList.add('active');
+                document.getElementById('tabCompare').classList.remove('hidden');
+                loadHistory(currentDays);
+                loadComparison();
+            }
+        }
+
+        // ============ TOAST ============
+        function showToast(message, type = 'info') {
+            const existing = document.querySelector('.toast');
+            if (existing) existing.remove();
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.3s';
+                setTimeout(() => toast.remove(), 300);
+            }, 2500);
+        }
+
+        // ============ AUTO-SAVE БЖУ ============
+        document.querySelectorAll('#tabMy .input-group input').forEach(input => {
+            input.addEventListener('change', function() {
+                userData[this.id] = parseFloat(this.value) || 0;
+                updateStats();
+                updateProgressBars();
+            });
+        });
+
+        // ============ INIT ============
+        loadUserData();
+        setInterval(() => {
+            if (!document.getElementById('tabCompare').classList.contains('hidden')) {
+                loadHistory(currentDays);
+                loadComparison();
+            }
+        }, 60000);
+    </script>
 </body>
 </html>
