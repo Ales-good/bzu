@@ -997,11 +997,11 @@
         }
 
         function renderHistoryCharts(data) {
+            const ctx1 = document.getElementById('historyCaloriesChart').getContext('2d');
+            if (historyCaloriesChart) historyCaloriesChart.destroy();
+            
             if (!data || !data.dates || data.dates.length === 0) {
-                console.log('📊 Нет данных для графиков');
                 // Показываем пустой график
-                const ctx1 = document.getElementById('historyCaloriesChart').getContext('2d');
-                if (historyCaloriesChart) historyCaloriesChart.destroy();
                 historyCaloriesChart = new Chart(ctx1, {
                     type: 'line',
                     data: {
@@ -1034,6 +1034,62 @@
                         }
                     }
                 });
+                
+                const ctx2 = document.getElementById('historyPlanChart').getContext('2d');
+                if (historyPlanChart) historyPlanChart.destroy();
+                historyPlanChart = new Chart(ctx2, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Нет данных'],
+                        datasets: [
+                            {
+                                label: '✅ Выполнено',
+                                data: [0],
+                                backgroundColor: 'rgba(107,203,119,0.6)',
+                                borderColor: '#6BCB77',
+                                borderWidth: 1,
+                                borderRadius: 4,
+                                barPercentage: 0.6
+                            },
+                            {
+                                label: '📋 Всего',
+                                data: [0],
+                                backgroundColor: 'rgba(255,255,255,0.05)',
+                                borderColor: 'rgba(255,255,255,0.2)',
+                                borderWidth: 1,
+                                borderRadius: 4,
+                                barPercentage: 0.6
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'bottom',
+                                labels: {
+                                    usePointStyle: true,
+                                    padding: 12,
+                                    color: 'rgba(255,255,255,0.6)',
+                                    font: { size: 10 }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: { color: 'rgba(255,255,255,0.05)' },
+                                ticks: { color: 'rgba(255,255,255,0.4)', stepSize: 1 }
+                            },
+                            x: {
+                                grid: { display: false },
+                                ticks: { color: 'rgba(255,255,255,0.4)' }
+                            }
+                        }
+                    }
+                });
                 return;
             }
             
@@ -1042,8 +1098,6 @@
                 return `${parts[2]}.${parts[1]}`;
             });
 
-            const ctx1 = document.getElementById('historyCaloriesChart').getContext('2d');
-            if (historyCaloriesChart) historyCaloriesChart.destroy();
             historyCaloriesChart = new Chart(ctx1, {
                 type: 'line',
                 data: {
@@ -1182,21 +1236,24 @@
             });
             
             // Закрываем
-            try {
-                if (tg) {
-                    tg.close();
-                } else {
-                    window.close();
+            setTimeout(() => {
+                try {
+                    if (tg && tg.close) {
+                        tg.close();
+                    } else if (window.close) {
+                        window.close();
+                    } else {
+                        console.log('ℹ️ Не удалось закрыть окно');
+                    }
+                } catch (e) {
+                    console.log('ℹ️ Не удалось закрыть окно:', e);
                 }
-            } catch (e) {
-                console.log('ℹ️ Не удалось закрыть окно');
-            }
+            }, 300);
         }
 
         // ============ БЖУ ============
         async function loadUserData() {
             if (!userId) {
-                // Если нет Telegram, создаем тестового пользователя
                 userId = Date.now();
                 userName = 'Тест';
                 document.getElementById('userName').textContent = userName;
@@ -1208,7 +1265,6 @@
             try {
                 console.log('📥 Загружаем данные пользователя:', userId);
                 
-                // СОЗДАЁМ пользователя с именем
                 const url = `/api/user/${userId}?first_name=${encodeURIComponent(userName)}`;
                 const data = await apiCall(url);
                 if (!data) {
@@ -1238,8 +1294,6 @@
         
                 updateStats();
                 updateProgressBars();
-        
-                // Загружаем план
                 await loadPlanFromServer();
         
                 if (!document.getElementById('tabCompare').classList.contains('hidden')) {
@@ -1344,7 +1398,13 @@
                 });
 
                 if (result && result.status === 'success') {
-                    userData = data;
+                    // Обновляем userData после сохранения
+                    userData.protein = data.protein;
+                    userData.fat = data.fat;
+                    userData.carbs = data.carbs;
+                    userData.fiber = data.fiber;
+                    userData.calories = data.calories;
+                    
                     updateStats();
                     updateProgressBars();
                     showToast('✅ Сохранено!', 'success');
@@ -1384,8 +1444,15 @@
                 }
 
                 const container = document.getElementById('comparisonContainer');
-                if (data.length === 0) {
-                    container.innerHTML = '<p style="text-align:center;color:var(--text-secondary);padding:20px;">📭 Нет данных</p>';
+                
+                // ФИЛЬТРУЕМ - показываем только пользователей с активностью (хоть что-то > 0)
+                const activeUsers = data.filter(rec => {
+                    const total = rec.protein + rec.fat + rec.carbs + rec.fiber + rec.calories;
+                    return total > 0;
+                });
+                
+                if (activeUsers.length === 0) {
+                    container.innerHTML = '<p style="text-align:center;color:var(--text-secondary);padding:20px;">📭 Сегодня никто не ввел данные</p>';
                     return;
                 }
 
@@ -1393,10 +1460,9 @@
                     <th>Участник</th><th>🍗</th><th>🧈</th><th>🍞</th><th>🥦</th><th>🔥</th><th>Статус</th>
                 </tr></thead><tbody>`;
 
-                data.forEach(rec => {
+                activeUsers.forEach(rec => {
                     const name = rec.first_name || rec.username || `User ${rec.user_id}`;
                     const total = rec.protein + rec.fat + rec.carbs + rec.fiber + rec.calories;
-                    const isActive = total > 0;
                     
                     const getBadge = (status) => {
                         const map = {
@@ -1416,7 +1482,7 @@
                     };
                     
                     html += `<tr>
-                        <td class="user-name">${isActive ? '🟢' : '⚪'} ${name}</td>
+                        <td class="user-name">🟢 ${name}</td>
                         <td>${rec.protein.toFixed(0)} ${getBadge(rec.protein_status)}</td>
                         <td>${rec.fat.toFixed(0)} ${getBadge(rec.fat_status)}</td>
                         <td>${rec.carbs.toFixed(0)} ${getBadge(rec.carbs_status)}</td>
