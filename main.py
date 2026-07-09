@@ -389,14 +389,20 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
         if update.message.text and f"@{context.bot.username}" in update.message.text:
             await start(update, context)
 
-# ============ ЗАПУСК БОТА ПРИ СТАРТЕ ============
-def start_bot():
-    """Запускает Telegram бота в отдельном потоке"""
+# ============ ЗАПУСК БОТА В ОТДЕЛЬНОМ ПОТОКЕ С EVENT LOOP ============
+def run_bot():
+    """Запускает Telegram бота в отдельном потоке с event loop"""
     try:
+        # Создаем новый event loop для этого потока
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
         print("🤖 Запуск Telegram бота...")
         
+        # Создаем приложение
         bot_app = Application.builder().token(TELEGRAM_TOKEN).build()
         
+        # Добавляем обработчики
         bot_app.add_handler(CommandHandler("start", start))
         bot_app.add_handler(CommandHandler("help", help_command))
         bot_app.add_handler(CommandHandler("stats", stats_command))
@@ -405,17 +411,26 @@ def start_bot():
         
         print("✅ Обработчики команд добавлены")
         
-        # Запускаем бота
-        bot_app.run_polling(
+        # Запускаем бота с polling в этом event loop
+        loop.run_until_complete(bot_app.initialize())
+        loop.run_until_complete(bot_app.start())
+        loop.run_until_complete(bot_app.updater.start_polling(
             allowed_updates=["message", "callback_query"],
-            stop_signals=[],
             drop_pending_updates=True
-        )
+        ))
+        
+        print("✅ Бот успешно запущен и слушает сообщения!")
+        
+        # Держим поток живым
+        loop.run_forever()
+        
     except Exception as e:
         print(f"❌ Ошибка в боте: {e}")
+        import traceback
+        traceback.print_exc()
 
-# Запускаем бота при старте
-bot_thread = threading.Thread(target=start_bot, daemon=True)
+# Запускаем бота в отдельном потоке
+bot_thread = threading.Thread(target=run_bot, daemon=True)
 bot_thread.start()
 print("✅ Бот запущен в фоновом потоке")
 
