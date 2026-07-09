@@ -5,41 +5,18 @@ from typing import List, Dict, Optional
 import json
 import re
 
-DB_NAME = "bzu.db"
-
 def get_db():
-    """Подключаемся к MySQL"""
+    """Подключаемся к MySQL (прямое подключение)"""
     
-    # Сначала пробуем получить MYSQL_URL
-    mysql_url = os.getenv("MYSQL_URL")
+    # Данные из твоей консоли Railway
+    host = "mysql.railway.internal"
+    user = "root"
+    password = "ZblKDXodWUWBsbvhprKbKLXEzkEgYOfC"
+    database = "railway"
+    port = 3306
     
-    if mysql_url:
-        # Парсим URL: mysql://user:password@host:port/database
-        pattern = r'mysql://([^:]+):([^@]+)@([^:]+):(\d+)/(.+)'
-        match = re.match(pattern, mysql_url)
-        if match:
-            user, password, host, port, database = match.groups()
-            port = int(port)
-            print(f"🔌 Подключение к MySQL через MYSQL_URL: {host}:{port}/{database}")
-        else:
-            raise Exception(f"❌ Неверный формат MYSQL_URL: {mysql_url}")
-    else:
-        # Если нет MYSQL_URL — используем отдельные переменные
-        host = os.getenv("MYSQLHOST")
-        user = os.getenv("MYSQLUSER")
-        password = os.getenv("MYSQLPASSWORD")
-        database = os.getenv("MYSQLDATABASE")
-        port = int(os.getenv("MYSQLPORT", 3306))
-        
-        if not all([host, user, password, database]):
-            raise Exception(
-                "❌ Не найдены переменные для подключения к MySQL!\n"
-                "Добавь MYSQL_URL или отдельные переменные (MYSQLHOST, MYSQLUSER, MYSQLPASSWORD, MYSQLDATABASE)"
-            )
-        
-        print(f"🔌 Подключение к MySQL через отдельные переменные: {host}:{port}/{database}")
+    print(f"🔌 Подключение к MySQL: {host}:{port}/{database}")
     
-    # Подключаемся
     conn = pymysql.connect(
         host=host,
         user=user,
@@ -105,7 +82,7 @@ def init_db():
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ''')
     
-    # ===== ТАБЛИЦА ДЛЯ ПЛАНА =====
+    # Таблица для плана
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS plan_records (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -341,7 +318,6 @@ def get_plan_record(user_id: int, record_date: str = None) -> Optional[Dict]:
     conn.close()
     
     if record:
-        # Парсим JSON обратно в dict
         return json.loads(record['plan_data'])
     return None
 
