@@ -253,7 +253,20 @@ def get_user_history(user_id: int, days: int = 90) -> List[Dict]:
     
     records = cursor.fetchall()
     conn.close()
-    return records
+    
+    # Преобразуем Decimal в float для JSON
+    result = []
+    for rec in records:
+        result.append({
+            'record_date': rec['record_date'].isoformat() if hasattr(rec['record_date'], 'isoformat') else str(rec['record_date']),
+            'protein': float(rec['protein']) if rec['protein'] else 0,
+            'fat': float(rec['fat']) if rec['fat'] else 0,
+            'carbs': float(rec['carbs']) if rec['carbs'] else 0,
+            'fiber': float(rec['fiber']) if rec['fiber'] else 0,
+            'calories': float(rec['calories']) if rec['calories'] else 0
+        })
+    
+    return result
 
 # ============ ЛИМИТЫ ============
 
