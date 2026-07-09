@@ -3,32 +3,43 @@ import pymysql
 from datetime import date
 from typing import List, Dict, Optional
 import json
+import re
 
 DB_NAME = "bzu.db"
 
 def get_db():
     """Подключаемся к MySQL"""
     
-    # Берем переменные из окружения
-    host = os.getenv("MYSQLHOST")
-    user = os.getenv("MYSQLUSER")
-    password = os.getenv("MYSQLPASSWORD")
-    database = os.getenv("MYSQLDATABASE")
-    port = int(os.getenv("MYSQLPORT", 3306))
+    # Сначала пробуем получить MYSQL_URL
+    mysql_url = os.getenv("MYSQL_URL")
     
-    if not all([host, user, password, database]):
-        # Пробуем через MYSQL_URL
-        mysql_url = os.getenv("MYSQL_URL")
-        if mysql_url:
-            import re
-            pattern = r'mysql://([^:]+):([^@]+)@([^:]+):(\d+)/(.+)'
-            match = re.match(pattern, mysql_url)
-            if match:
-                user, password, host, port, database = match.groups()
-                port = int(port)
+    if mysql_url:
+        # Парсим URL: mysql://user:password@host:port/database
+        pattern = r'mysql://([^:]+):([^@]+)@([^:]+):(\d+)/(.+)'
+        match = re.match(pattern, mysql_url)
+        if match:
+            user, password, host, port, database = match.groups()
+            port = int(port)
+            print(f"🔌 Подключение к MySQL через MYSQL_URL: {host}:{port}/{database}")
+        else:
+            raise Exception(f"❌ Неверный формат MYSQL_URL: {mysql_url}")
+    else:
+        # Если нет MYSQL_URL — используем отдельные переменные
+        host = os.getenv("MYSQLHOST")
+        user = os.getenv("MYSQLUSER")
+        password = os.getenv("MYSQLPASSWORD")
+        database = os.getenv("MYSQLDATABASE")
+        port = int(os.getenv("MYSQLPORT", 3306))
+        
+        if not all([host, user, password, database]):
+            raise Exception(
+                "❌ Не найдены переменные для подключения к MySQL!\n"
+                "Добавь MYSQL_URL или отдельные переменные (MYSQLHOST, MYSQLUSER, MYSQLPASSWORD, MYSQLDATABASE)"
+            )
+        
+        print(f"🔌 Подключение к MySQL через отдельные переменные: {host}:{port}/{database}")
     
-    print(f"🔌 Подключение к MySQL: {host}:{port}/{database}")
-    
+    # Подключаемся
     conn = pymysql.connect(
         host=host,
         user=user,
