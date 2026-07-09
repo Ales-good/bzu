@@ -280,14 +280,11 @@ def update_limits(user_id: int,
 # ============ ПЛАН ВЫПОЛНЕНИЯ ============
 
 def save_plan_record(user_id: int, plan_data: dict, record_date: str = None):
-    """Сохраняет план выполнения на дату"""
     if not record_date:
         record_date = date.today().isoformat()
     
     conn = get_db()
     cursor = conn.cursor()
-    
-    # Преобразуем dict в JSON строку
     plan_json = json.dumps(plan_data)
     
     cursor.execute('''
@@ -297,26 +294,21 @@ def save_plan_record(user_id: int, plan_data: dict, record_date: str = None):
             plan_data = VALUES(plan_data),
             updated_at = CURRENT_TIMESTAMP
     ''', (user_id, record_date, plan_json))
-    
     conn.commit()
     conn.close()
 
 def get_plan_record(user_id: int, record_date: str = None) -> Optional[Dict]:
-    """Получает план на дату"""
     if not record_date:
         record_date = date.today().isoformat()
     
     conn = get_db()
     cursor = conn.cursor()
-    
     cursor.execute('''
         SELECT plan_data FROM plan_records
         WHERE user_id = %s AND record_date = %s
     ''', (user_id, record_date))
-    
     record = cursor.fetchone()
     conn.close()
-    
     if record:
         return json.loads(record['plan_data'])
     return None
