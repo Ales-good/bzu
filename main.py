@@ -23,7 +23,7 @@ init_db()
 print("✅ БД готова")
 
 # ============ НАСТРОЙКИ ============
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "ВАШ_ТОКЕН_ОТ_BOTFATHER")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "8704240954:AAG4AV6Wrt_9aQhn400ljcWTNq80gc0LpWM")
 WEBAPP_URL = os.getenv("WEBAPP_URL", "https://bzu-production.up.railway.app")
 
 app = FastAPI()
