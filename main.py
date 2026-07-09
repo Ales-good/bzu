@@ -199,6 +199,12 @@ async def update_limits_endpoint(data: LimitsData):
 async def save_plan(data: PlanData):
     try:
         print(f"📥 Сохраняем план для user_id={data.user_id}")
+        
+        # ПРОВЕРЯЕМ, существует ли пользователь
+        user = get_or_create_user(data.user_id)
+        if not user:
+            raise HTTPException(status_code=400, detail="Пользователь не найден")
+        
         print(f"📊 Данные: {data.plan_data}")
         save_plan_record(data.user_id, data.plan_data, data.record_date)
         return {"status": "success", "message": "План сохранен"}
