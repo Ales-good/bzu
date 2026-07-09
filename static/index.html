@@ -1030,7 +1030,10 @@
             try {
                 // Загружаем всех пользователей
                 const users = await apiCall('/api/users');
-                if (!users) return;
+                if (!users) {
+                    console.error('❌ Не удалось загрузить пользователей');
+                    return;
+                }
                 
                 // ФИЛЬТРУЕМ - только пользователи с активностью
                 const activeUsers = [];
@@ -1039,10 +1042,11 @@
                     const history = await apiCall(`/api/history/${user.user_id}?days=${days}`);
                     if (history && history.dates && history.dates.length > 0) {
                         // Проверяем, есть ли хоть какие-то данные (не все нули)
-                        const hasData = history.calories.some(c => c > 0) || 
-                                       history.protein?.some(p => p > 0) ||
-                                       history.plan_data?.some(p => Object.keys(p).length > 0);
-                        if (hasData) {
+                        const hasCalories = history.calories && history.calories.some(c => c > 0);
+                        const hasProtein = history.protein && history.protein.some(p => p > 0);
+                        const hasPlan = history.plan_data && history.plan_data.some(p => Object.keys(p).length > 0);
+                        
+                        if (hasCalories || hasProtein || hasPlan) {
                             activeUsers.push(user);
                         }
                     }
@@ -1056,25 +1060,23 @@
                 // Если нет активных пользователей - показываем сообщение
                 if (activeUsers.length === 0) {
                     userSelector.innerHTML = '<span style="color: var(--text-secondary); font-size: 14px;">📭 Нет активных пользователей</span>';
-                    // Показываем пустые графики
                     renderEmptyCharts();
                     return;
                 }
                 
                 // Добавляем чипы только для активных пользователей
-                activeUsers.forEach(user => {
+                selectedUsers = []; // Очищаем перед добавлением
+                activeUsers.forEach((user, index) => {
                     const chip = document.createElement('span');
                     chip.className = 'user-chip';
                     chip.dataset.userId = user.user_id;
                     chip.textContent = user.first_name || `User ${user.user_id}`;
                     
-                    // По умолчанию выбираем текущего пользователя
+                    // По умолчанию выбираем текущего пользователя или первого активного
                     const isCurrent = user.user_id === userId;
-                    if (isCurrent || selectedUsers.length === 0) {
+                    if (isCurrent || (selectedUsers.length === 0 && index === 0)) {
                         chip.classList.add('active');
-                        if (!selectedUsers.includes(user.user_id)) {
-                            selectedUsers.push(user.user_id);
-                        }
+                        selectedUsers.push(user.user_id);
                     }
                     
                     chip.onclick = function() {
@@ -1087,7 +1089,6 @@
                             selectedUsers.push(id);
                         }
                         if (selectedUsers.length === 0) {
-                            // Если никого не выбрано - показываем пустые графики
                             renderEmptyCharts();
                         } else {
                             loadAllCharts(days);
@@ -1106,7 +1107,40 @@
                 
             } catch (error) {
                 console.error('❌ Ошибка загрузки аналитики:', error);
+                showToast('❌ Ошибка загрузки аналитики', 'error');
             }
+        }
+        
+        async function loadAllCharts(days) {
+            if (selectedUsers.length === 0) return;
+            
+            // Загружаем данные для всех выбранных пользователей
+            const allData = {};
+            for (const uid of selectedUsers) {
+                const history = await apiCall(`/api/history/${uid}?days=${days}`);
+                if (history && history.dates && history.dates.length > 0) {
+                    allData[uid] = history;
+                }
+            }
+            
+            // Получаем имена пользователей
+            const users = await apiCall('/api/users');
+            const userNames = {};
+            if (users) {
+                users.forEach(u => {
+                    userNames[u.user_id] = u.first_name || `User ${u.user_id}`;
+                });
+            }
+            
+            if (Object.keys(allData).length === 0) {
+                renderEmptyCharts();
+                return;
+            }
+            
+            renderCaloriesChart(allData, userNames);
+            renderBZUChart(allData, userNames);
+            renderExercisesChart(allData, userNames);
+            renderConditionsChart(allData, userNames);
         }
         
         function renderEmptyCharts() {
@@ -1262,10 +1296,12 @@
                 const data = allData[uid];
                 if (data && data.dates && data.dates.length > 0) {
                     const lastIndex = data.dates.length - 1;
-                    const protein = data.protein ? data.protein[lastIndex] || 0 : 0;
-                    const fat = data.fat ? data.fat[lastIndex] || 0 : 0;
-                    const carbs = data.carbs ? data.carbs[lastIndex] || 0 : 0;
-                    const fiber = data.fiber ? data.fiber[lastIndex] || 0 : 0;
+                    
+                    // Проверяем наличие данных по каждому показателю
+                    const protein = data.protein && data.protein.length > lastIndex ? data.protein[lastIndex] || 0 : 0;
+                    const fat = data.fat && data.fat.length > lastIndex ? data.fat[lastIndex] || 0 : 0;
+                    const carbs = data.carbs && data.carbs.length > lastIndex ? data.carbs[lastIndex] || 0 : 0;
+                    const fiber = data.fiber && data.fiber.length > lastIndex ? data.fiber[lastIndex] || 0 : 0;
                     
                     // Показываем только если есть хоть какие-то данные
                     if (protein > 0 || fat > 0 || carbs > 0 || fiber > 0) {
@@ -1294,7 +1330,7 @@
                         {
                             label: '🍗 Белки (г)',
                             data: proteinData,
-                            backgroundColor: '#FF6B6B',
+                            backgroundColor: 'rgba(255,107,107,0.8)',
                             borderColor: '#FF6B6B',
                             borderWidth: 2,
                             borderRadius: 4
@@ -1302,7 +1338,7 @@
                         {
                             label: '🧈 Жиры (г)',
                             data: fatData,
-                            backgroundColor: '#FFD93D',
+                            backgroundColor: 'rgba(255,217,61,0.8)',
                             borderColor: '#FFD93D',
                             borderWidth: 2,
                             borderRadius: 4
@@ -1310,7 +1346,7 @@
                         {
                             label: '🍞 Углеводы (г)',
                             data: carbsData,
-                            backgroundColor: '#6BCB77',
+                            backgroundColor: 'rgba(107,203,119,0.8)',
                             borderColor: '#6BCB77',
                             borderWidth: 2,
                             borderRadius: 4
@@ -1318,7 +1354,7 @@
                         {
                             label: '🥦 Клетчатка (г)',
                             data: fiberData,
-                            backgroundColor: '#4D96FF',
+                            backgroundColor: 'rgba(77,150,255,0.8)',
                             borderColor: '#4D96FF',
                             borderWidth: 2,
                             borderRadius: 4
@@ -1341,7 +1377,7 @@
                         tooltip: {
                             callbacks: {
                                 label: function(ctx) {
-                                    return ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(0);
+                                    return ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(1);
                                 }
                             }
                         }
