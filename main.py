@@ -1,16 +1,13 @@
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List
 import uvicorn
-import threading
 import os
-import time
-import asyncio
-from datetime import date
 import logging
+from datetime import date
 
 from database_mysql import (
     init_db, get_or_create_user, save_bzu_record, 
@@ -35,6 +32,7 @@ print("✅ БД готова")
 
 TELEGRAM_TOKEN = "8704240954:AAG4AV6Wrt_9aQhn400ljcWTNq80gc0LpWM"
 WEBAPP_URL = os.getenv("WEBAPP_URL", "https://bzu-production.up.railway.app")
+WEBHOOK_URL = f"{WEBAPP_URL}/webhook"
 
 app = FastAPI()
 
@@ -256,6 +254,9 @@ async def get_history(user_id: int, days: int = 90):
     }
 
 # ============ ТЕЛЕГРАМ БОТ ============
+# Глобальный экземпляр бота
+bot_app = None
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Приветствие и главное меню"""
     if not update.message:
@@ -266,7 +267,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     print(f"📩 /start от {user.first_name} (ID: {user.id}) в чате: {chat.type if chat else 'unknown'}")
     
-    # ПРОСТАЯ КНОПКА - ТОЛЬКО ССЫЛКА
     keyboard = [[
         InlineKeyboardButton(
             "📊 Открыть дневник",
@@ -274,7 +274,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     ]]
     
-    # Вторая кнопка - callback
     keyboard.append([
         InlineKeyboardButton(
             "📈 Статистика",
@@ -282,17 +281,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     ])
     
-    if chat and chat.type in ['group', 'supergroup']:
-        text = (
-            "👋 Привет! Я бот для учета БЖУ.\n\n"
-            "📝 Нажми кнопку ниже, чтобы открыть дневник."
-        )
-    else:
-        text = (
-            "👋 Привет! Я бот для учета БЖУ.\n\n"
-            "📝 Нажми кнопку ниже, чтобы открыть дневник.\n"
-            "Добавь меня в группу, чтобы сравнивать результаты!"
-        )
+    text = (
+        "👋 Привет! Я бот для учета БЖУ.\n\n"
+        "📝 Нажми кнопку ниже, чтобы открыть дневник."
+    )
     
     await update.message.reply_text(
         text,
@@ -373,19 +365,30 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
         if update.message.text and f"@{context.bot.username}" in update.message.text:
             await start(update, context)
 
-# ============ ЗАПУСК БОТА ============
-# Глобальная переменная для бота
-bot_app = None
+# Webhook endpoint
+@app.post("/webhook")
+async def webhook(request: Request):
+    """Принимает обновления от Telegram"""
+    global bot_app
+    if bot_app is None:
+        return Response("Bot not initialized", status_code=500)
+    
+    try:
+        data = await request.json()
+        update = Update.de_json(data, bot_app.bot)
+        await bot_app.process_update(update)
+        return Response("OK", status_code=200)
+    except Exception as e:
+        print(f"❌ Webhook error: {e}")
+        return Response("Error", status_code=500)
 
-def run_bot():
-    """Запускает Telegram бота"""
+# ============ ЗАПУСК БОТА ============
+@app.on_event("startup")
+async def startup():
+    """Запускает бота при старте сервера"""
     global bot_app
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        
-        print("🤖 Запуск Telegram бота...")
-        
+        print("🤖 Инициализация бота...")
         bot_app = Application.builder().token(TELEGRAM_TOKEN).build()
         
         bot_app.add_handler(CommandHandler("start", start))
@@ -394,29 +397,24 @@ def run_bot():
         bot_app.add_handler(CallbackQueryHandler(handle_callback))
         bot_app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.GROUPS, handle_group_message))
         
-        print("✅ Обработчики команд добавлены")
+        await bot_app.initialize()
+        await bot_app.start()
         
-        # Очищаем вебхук перед запуском
-        loop.run_until_complete(bot_app.bot.delete_webhook(drop_pending_updates=True))
-        
-        # Запускаем polling
-        loop.run_until_complete(bot_app.initialize())
-        loop.run_until_complete(bot_app.start())
-        loop.run_until_complete(bot_app.updater.start_polling(
-            allowed_updates=["message", "callback_query"],
-            drop_pending_updates=True
-        ))
+        # Устанавливаем вебхук
+        await bot_app.bot.set_webhook(WEBHOOK_URL, drop_pending_updates=True)
+        print(f"✅ Webhook установлен: {WEBHOOK_URL}")
         
         print("✅ Бот успешно запущен!")
-        loop.run_forever()
-        
     except Exception as e:
-        print(f"❌ Ошибка в боте: {e}")
+        print(f"❌ Ошибка запуска бота: {e}")
 
-# Запускаем бота в отдельном потоке
-thread = threading.Thread(target=run_bot, daemon=True)
-thread.start()
-print("✅ Бот запущен в фоновом потоке")
+@app.on_event("shutdown")
+async def shutdown():
+    """Останавливает бота"""
+    global bot_app
+    if bot_app:
+        await bot_app.stop()
+        print("✅ Бот остановлен")
 
 # ============ ЗАПУСК FASTAPI ============
 if __name__ == "__main__":
