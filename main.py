@@ -10,6 +10,7 @@ import os
 import time
 import asyncio
 from datetime import date
+import logging
 
 from database_mysql import (
     init_db, get_or_create_user, save_bzu_record, 
@@ -19,9 +20,14 @@ from database_mysql import (
     get_user_history, update_user_name
 )
 
-# Импорты для Telegram
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo, CallbackQuery
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler, MessageHandler, filters
+
+# Настройка логов
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
 
 print("🔧 Инициализация БД...")
 init_db()
@@ -383,42 +389,38 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
         if update.message.text and f"@{context.bot.username}" in update.message.text:
             await start(update, context)
 
-# ============ ЗАПУСК ============
+# ============ ЗАПУСК БОТА ПРИ СТАРТЕ ============
+def start_bot():
+    """Запускает Telegram бота в отдельном потоке"""
+    try:
+        print("🤖 Запуск Telegram бота...")
+        
+        bot_app = Application.builder().token(TELEGRAM_TOKEN).build()
+        
+        bot_app.add_handler(CommandHandler("start", start))
+        bot_app.add_handler(CommandHandler("help", help_command))
+        bot_app.add_handler(CommandHandler("stats", stats_command))
+        bot_app.add_handler(CallbackQueryHandler(handle_callback))
+        bot_app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.GROUPS, handle_group_message))
+        
+        print("✅ Обработчики команд добавлены")
+        
+        # Запускаем бота
+        bot_app.run_polling(
+            allowed_updates=["message", "callback_query"],
+            stop_signals=[],
+            drop_pending_updates=True
+        )
+    except Exception as e:
+        print(f"❌ Ошибка в боте: {e}")
+
+# Запускаем бота при старте
+bot_thread = threading.Thread(target=start_bot, daemon=True)
+bot_thread.start()
+print("✅ Бот запущен в фоновом потоке")
+
+# ============ ЗАПУСК FASTAPI ============
 if __name__ == "__main__":
-    print("🚀 Запуск приложения...")
-    
-    if not TELEGRAM_TOKEN:
-        print("❌ ОШИБКА: TELEGRAM_TOKEN не задан!")
-        exit(1)
-    
-    bot_app = Application.builder().token(TELEGRAM_TOKEN).build()
-    
-    bot_app.add_handler(CommandHandler("start", start))
-    bot_app.add_handler(CommandHandler("help", help_command))
-    bot_app.add_handler(CommandHandler("stats", stats_command))
-    bot_app.add_handler(CallbackQueryHandler(handle_callback))
-    bot_app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.GROUPS, handle_group_message))
-    
-    print("✅ Обработчики команд добавлены")
-    print("🤖 Запуск Telegram бота...")
-    
-    def run_bot_in_thread():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            bot_app.run_polling(
-                allowed_updates=["message", "callback_query"],
-                stop_signals=[]
-            )
-        except Exception as e:
-            print(f"❌ Ошибка в боте: {e}")
-    
-    bot_thread = threading.Thread(target=run_bot_in_thread, daemon=True)
-    bot_thread.start()
-    print("✅ Бот запущен в фоновом потоке")
-    
-    time.sleep(0.5)
-    
-    port = int(os.getenv("PORT", 8000))
+    port = int(os.getenv("PORT", 8080))
     print(f"🚀 Сервер запускается на порту {port}")
     uvicorn.run(app, host="0.0.0.0", port=port)
