@@ -266,11 +266,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     print(f"📩 /start от {user.first_name} (ID: {user.id}) в чате: {chat.type if chat else 'unknown'}")
     
-    # БЕЗ КНОПОК - используем Menu Button из BotFather
+    # Кнопка для открытия дневника (работает везде)
+    keyboard = [[
+        InlineKeyboardButton(
+            "📊 Открыть дневник",
+            web_app=WebAppInfo(url=WEBAPP_URL)
+        )
+    ]]
+    
     if chat and chat.type in ['group', 'supergroup']:
         text = (
-            "👋 Привет! Я бот для учета БЖУ.\n\n"
-            "📝 Нажми на кнопку <b>Menu</b> внизу экрана, чтобы открыть дневник.\n\n"
+            "👋 Привет! Я бот для учета БЖУ в этой группе.\n\n"
+            "📝 Нажми на кнопку ниже, чтобы открыть дневник.\n"
             "Там ты сможешь:\n"
             "✅ Вводить свои показатели (БЖУ + калории)\n"
             "📈 Смотреть графики динамики\n"
@@ -283,7 +290,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         text = (
             "👋 Привет! Я бот для учета БЖУ.\n\n"
-            "📝 Нажми на кнопку <b>Menu</b> внизу экрана, чтобы открыть дневник.\n\n"
+            "📝 Нажми на кнопку ниже, чтобы открыть дневник.\n"
+            "Также можешь нажать кнопку <b>Menu</b> внизу экрана.\n\n"
             "Добавь меня в группу, чтобы сравнивать результаты!\n\n"
             "💡 Команды:\n"
             "/start - Главное меню\n"
@@ -291,7 +299,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "/help - Помощь"
         )
     
-    await update.message.reply_text(text, parse_mode='HTML')
+    await update.message.reply_text(
+        text,
+        reply_markup=InlineKeyboardMarkup(keyboard),
+        parse_mode='HTML'
+    )
 
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показывает статистику за сегодня"""
@@ -327,7 +339,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/start - Главное меню\n"
         "/stats - Статистика за сегодня\n"
         "/help - Помощь\n\n"
-        "📝 Нажми на кнопку <b>Menu</b> внизу экрана, чтобы открыть дневник.",
+        "📝 Нажми на кнопку «Открыть дневник» или кнопку <b>Menu</b> внизу экрана.",
         parse_mode='HTML'
     )
 
