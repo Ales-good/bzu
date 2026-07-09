@@ -3,6 +3,7 @@ import pymysql
 from datetime import date
 from typing import List, Dict, Optional
 import re
+import json
 
 def get_db():
     """Подключаемся к MySQL (прямое подключение)"""
@@ -236,6 +237,74 @@ def get_user_limits(user_id: int) -> Dict:
             'fiber_min': 10,
             'fiber_max': 20
         }
+
+def save_plan_record(user_id: int, plan_data: dict, record_date: str = None):
+    """Сохраняет план выполнения на дату"""
+    if not record_date:
+        record_date = date.today().isoformat()
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    # Преобразуем dict в JSON строку
+    plan_json = json.dumps(plan_data)
+    
+    cursor.execute('''
+        INSERT INTO plan_records (user_id, record_date, plan_data)
+        VALUES (%s, %s, %s)
+        ON DUPLICATE KEY UPDATE
+            plan_data = VALUES(plan_data),
+            updated_at = CURRENT_TIMESTAMP
+    ''', (user_id, record_date, plan_json))
+    
+    conn.commit()
+    conn.close()
+
+def get_plan_record(user_id: int, record_date: str = None) -> Optional[Dict]:
+    """Получает план на дату"""
+    if not record_date:
+        record_date = date.today().isoformat()
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT plan_data FROM plan_records
+        WHERE user_id = %s AND record_date = %s
+    ''', (user_id, record_date))
+    
+    record = cursor.fetchone()
+    conn.close()
+    
+    if record:
+        # Парсим JSON обратно в dict
+        return json.loads(record['plan_data'])
+    return None
+
+def get_plan_history(user_id: int, days: int = 30) -> List[Dict]:
+    """Получает историю плана за N дней"""
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT record_date, plan_data 
+        FROM plan_records
+        WHERE user_id = %s
+        ORDER BY record_date DESC
+        LIMIT %s
+    ''', (user_id, days))
+    
+    records = cursor.fetchall()
+    conn.close()
+    
+    result = []
+    for rec in records:
+        rec_dict = dict(rec)
+        rec_dict['plan_data'] = json.loads(rec_dict['plan_data'])
+        result.append(rec_dict)
+    
+    return result
+
 
 def update_limits(user_id: int, 
                   protein_min: float, protein_max: float,
