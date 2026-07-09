@@ -1233,6 +1233,7 @@
         async function saveData() {
             const data = {
                 user_id: userId,
+                user_name: userName,  // <-- ДОБАВЬ ЭТО
                 protein: parseFloat(document.getElementById('protein').value) || 0,
                 fat: parseFloat(document.getElementById('fat').value) || 0,
                 carbs: parseFloat(document.getElementById('carbs').value) || 0,
