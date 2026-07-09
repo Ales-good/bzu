@@ -129,6 +129,13 @@ async def get_today():
     return records
 
 def get_status(value, min_val, max_val):
+    if value is None:
+        value = 0
+    if min_val is None:
+        min_val = 0
+    if max_val is None:
+        max_val = 1
+    
     if value == 0:
         return 'empty'
     elif value < min_val:
