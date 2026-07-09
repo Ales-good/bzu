@@ -1150,1022 +1150,856 @@
     <button class="tg-button" onclick="closeApp()">✖️ Закрыть</button>
     
     <script>
-        // ============ CONFIG ============
-        const API_URL = window.location.origin;
-        let userId = null;
-        let userData = { protein: 0, fat: 0, carbs: 0, fiber: 0 };
-        let limits = {
-            protein_min: 150, protein_max: 200,
-            fat_min: 70, fat_max: 80,
-            carbs_min: 80, carbs_max: 100,
-            fiber_min: 10, fiber_max: 20
+    // ============ CONFIG ============
+    const API_URL = window.location.origin;
+    let userId = null;
+    let userData = { protein: 0, fat: 0, carbs: 0, fiber: 0 };
+    let limits = {
+        protein_min: 150, protein_max: 200,
+        fat_min: 70, fat_max: 80,
+        carbs_min: 80, carbs_max: 100,
+        fiber_min: 10, fiber_max: 20
+    };
+    let compareChart = null;
+    let planChart = null;
+    let currentPeriod = 'day';
+    let allPlanHistory = [];
+    
+    // ============ ПЛАН ВЫПОЛНЕНИЯ ============
+    const PLAN_ITEMS = [
+        { id: 'massage', icon: '💆', label: 'Массаж' },
+        { id: 'banya', icon: '🧖', label: 'Баня' },
+        { id: 'pool', icon: '🏊', label: 'Бассейн' },
+        { id: 'no_food', icon: '⏰', label: 'Не ел после 18' },
+        { id: 'pushups', icon: '💪', label: 'Отжимания' },
+        { id: 'squats', icon: '🦵', label: 'Приседания' },
+        { id: 'abs', icon: '🔥', label: 'Пресс' },
+        { id: 'gym', icon: '🏋️', label: 'Зал (силовые)' }
+    ];
+    
+    // ============ СОХРАНЕНИЕ ПЛАНА НА СЕРВЕР ============
+    async function savePlanToServer() {
+        const planData = getPlanData();
+        
+        const data = {
+            user_id: userId,
+            plan_data: planData,
+            record_date: new Date().toISOString().split('T')[0]
         };
-        let compareChart = null;
-        let planChart = null;
-        let currentPeriod = 'day';
-        let allPlanHistory = [];
         
-        // ============ ПЛАН ВЫПОЛНЕНИЯ ============
-        const PLAN_ITEMS = [
-            { id: 'massage', icon: '💆', label: 'Массаж' },
-            { id: 'banya', icon: '🧖', label: 'Баня' },
-            { id: 'pool', icon: '🏊', label: 'Бассейн' },
-            { id: 'no_food', icon: '⏰', label: 'Не ел после 18' },
-            { id: 'pushups', icon: '💪', label: 'Отжимания' },
-            { id: 'squats', icon: '🦵', label: 'Приседания' },
-            { id: 'abs', icon: '🔥', label: 'Пресс' },
-            { id: 'gym', icon: '🏋️', label: 'Зал (силовые)' }
-        ];
-        
-        function togglePlan(el) {
-            const isDone = el.classList.contains('done');
-            
-            if (isDone) {
-                el.classList.remove('done');
-                el.classList.add('pending');
-                el.querySelector('.status').textContent = '◻️';
-            } else {
-                el.classList.remove('pending');
-                el.classList.add('done');
-                el.querySelector('.status').textContent = '✅';
-            }
-            
-            const input = el.querySelector('.input-count');
-            if (input) {
-                const val = parseInt(input.value);
-                if (val > 0) {
-                    // сохраняем
-                }
-            }
-            
-            updatePlanProgress();
-            savePlanData();
-        }
-
-        function updatePlanProgress() {
-            const items = document.querySelectorAll('.plan-item');
-            const done = document.querySelectorAll('.plan-item.done');
-            const total = items.length;
-            const count = done.length;
-            
-            const badge = document.getElementById('planProgress');
-            badge.textContent = `${count}/${total}`;
-            
-            if (count === total) {
-                badge.className = 'badge-done';
-            } else {
-                badge.className = 'badge-pending';
-            }
-        }
-
-        function getPlanData() {
-            const items = document.querySelectorAll('.plan-item');
-            const data = {};
-            
-            items.forEach(el => {
-                const id = el.dataset.id;
-                const isDone = el.classList.contains('done');
-                const input = el.querySelector('.input-count');
-                const count = input ? parseInt(input.value) || 0 : 0;
-                
-                data[id] = {
-                    done: isDone,
-                    count: count
-                };
-            });
-            
-            return data;
-        }
-
-        // ============ СОХРАНЕНИЕ ПЛАНА НА СЕРВЕР ============
-        async function savePlanToServer() {
-            const planData = getPlanData();
-            
-            const data = {
-                user_id: userId,
-                plan_data: planData,
-                record_date: new Date().toISOString().split('T')[0]
-            };
-            
-            try {
-                const response = await fetch('/api/plan/save', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-                
-                if (response.ok) {
-                    console.log('✅ План сохранён на сервер');
-                } else {
-                    console.error('❌ Ошибка сохранения плана');
-                }
-            } catch (error) {
-                console.error('❌ Ошибка:', error);
-            }
-        }
-        
-        // ============ ЗАГРУЗКА ПЛАНА С СЕРВЕРА ============
-        async function loadPlanFromServer() {
-            try {
-                const response = await fetch(`/api/plan/get/${userId}`);
-                const data = await response.json();
-                
-                if (data.plan && Object.keys(data.plan).length > 0) {
-                    const plan = data.plan;
-                    
-                    document.querySelectorAll('.plan-item').forEach(el => {
-                        const id = el.dataset.id;
-                        if (plan[id]) {
-                            if (plan[id].done) {
-                                el.classList.remove('pending');
-                                el.classList.add('done');
-                                el.querySelector('.status').textContent = '✅';
-                            } else {
-                                el.classList.remove('done');
-                                el.classList.add('pending');
-                                el.querySelector('.status').textContent = '◻️';
-                            }
-                            
-                            const input = el.querySelector('.input-count');
-                            if (input && plan[id].count) {
-                                input.value = plan[id].count;
-                            }
-                        }
-                    });
-                    
-                    updatePlanProgress();
-                    console.log('✅ План загружен с сервера');
-                }
-            } catch (error) {
-                console.error('❌ Ошибка загрузки плана:', error);
-            }
-        }
-        
-        // ============ ОБНОВЛЁННАЯ ФУНКЦИЯ СОХРАНЕНИЯ ============
-        function togglePlan(el) {
-            const isDone = el.classList.contains('done');
-            
-            if (isDone) {
-                el.classList.remove('done');
-                el.classList.add('pending');
-                el.querySelector('.status').textContent = '◻️';
-            } else {
-                el.classList.remove('pending');
-                el.classList.add('done');
-                el.querySelector('.status').textContent = '✅';
-            }
-            
-            const input = el.querySelector('.input-count');
-            if (input) {
-                const val = parseInt(input.value);
-                if (val > 0) {
-                    // сохраняем
-                }
-            }
-            
-            updatePlanProgress();
-            savePlanData();
-            
-            // Сохраняем на сервер
-            savePlanToServer();
-        }
-        
-        // ============ ОБНОВЛЁННАЯ ФУНКЦИЯ ЗАГРУЗКИ ============
-        async function loadUserData() {
-            // ... существующий код ...
-            
-            // Загружаем план с сервера
-            await loadPlanFromServer();
-            
-            // Загружаем план из localStorage (как резерв)
-            loadPlanData();
-        }
-        
-        // ============ ПРИ ЗАКРЫТИИ ============
-        function closeApp() {
-            // Сохраняем план
-            savePlanToServer();
-            
-            // Сохраняем БЖУ
-            saveDataBeforeClose();
-            
-            // Закрываем WebApp
-            if (window.Telegram && window.Telegram.WebApp) {
-                window.Telegram.WebApp.close();
-            } else {
-                window.close();
-            }
-        }
-
-        // ============ ИСТОРИЯ ПЛАНА ============
-        function savePlanHistory(data) {
-            const today = new Date().toISOString().split('T')[0];
-            let history = JSON.parse(localStorage.getItem('plan_history_' + userId) || '[]');
-            
-            // Ищем запись за сегодня
-            const existing = history.findIndex(h => h.date === today);
-            const doneCount = Object.values(data).filter(v => v.done || v.count > 0).length;
-            const totalItems = PLAN_ITEMS.length;
-            
-            const entry = {
-                date: today,
-                done: doneCount,
-                total: totalItems,
-                items: data
-            };
-            
-            if (existing >= 0) {
-                history[existing] = entry;
-            } else {
-                history.push(entry);
-            }
-            
-            // Сортируем по дате
-            history.sort((a, b) => a.date.localeCompare(b.date));
-            
-            // Оставляем только последние 90 дней
-            if (history.length > 90) {
-                history = history.slice(-90);
-            }
-            
-            localStorage.setItem('plan_history_' + userId, JSON.stringify(history));
-            allPlanHistory = history;
-        }
-
-        function loadPlanHistory() {
-            const history = localStorage.getItem('plan_history_' + userId);
-            if (history) {
-                try {
-                    allPlanHistory = JSON.parse(history);
-                } catch (e) {
-                    allPlanHistory = [];
-                }
-            } else {
-                allPlanHistory = [];
-            }
-            
-            // Если сегодня нет записи — добавляем текущие данные
-            const today = new Date().toISOString().split('T')[0];
-            const existing = allPlanHistory.find(h => h.date === today);
-            if (!existing) {
-                const data = getPlanData();
-                const doneCount = Object.values(data).filter(v => v.done || v.count > 0).length;
-                allPlanHistory.push({
-                    date: today,
-                    done: doneCount,
-                    total: PLAN_ITEMS.length,
-                    items: data
-                });
-                localStorage.setItem('plan_history_' + userId, JSON.stringify(allPlanHistory));
-            }
-        }
-
-        // ============ СТАТИСТИКА ПЛАНА В СРАВНЕНИИ ============
-        function getFilteredHistory(period) {
-            const today = new Date();
-            let cutoff = new Date(today);
-            
-            switch(period) {
-                case 'day':
-                    cutoff.setDate(cutoff.getDate() - 1);
-                    break;
-                case 'week':
-                    cutoff.setDate(cutoff.getDate() - 7);
-                    break;
-                case 'month':
-                    cutoff.setMonth(cutoff.getMonth() - 1);
-                    break;
-                case 'all':
-                default:
-                    cutoff = new Date(2000, 0, 1);
-                    break;
-            }
-            
-            const cutoffStr = cutoff.toISOString().split('T')[0];
-            return allPlanHistory.filter(h => h.date >= cutoffStr);
-        }
-
-        function updatePlanStats(period) {
-            const filtered = getFilteredHistory(period);
-            
-            if (filtered.length === 0) {
-                document.getElementById('planTotalDone').textContent = '0';
-                document.getElementById('planTotalItems').textContent = '0';
-                document.getElementById('planPercent').textContent = '0%';
-                document.getElementById('planStreak').textContent = '0';
-                document.getElementById('planHistory').innerHTML = 
-                    '<p style="text-align:center;color:var(--text-secondary);padding:20px;">📭 Нет данных за этот период</p>';
-                return;
-            }
-            
-            // Общая статистика
-            let totalDone = 0;
-            let totalItems = 0;
-            
-            filtered.forEach(h => {
-                totalDone += h.done || 0;
-                totalItems += h.total || PLAN_ITEMS.length;
-            });
-            
-            const avgDone = totalDone / filtered.length;
-            const avgTotal = totalItems / filtered.length;
-            const percent = avgTotal > 0 ? Math.round((avgDone / avgTotal) * 100) : 0;
-            
-            document.getElementById('planTotalDone').textContent = Math.round(avgDone);
-            document.getElementById('planTotalItems').textContent = Math.round(avgTotal);
-            document.getElementById('planPercent').textContent = percent + '%';
-            
-            // Streak (серия дней подряд)
-            let streak = 0;
-            const sorted = [...allPlanHistory].sort((a, b) => b.date.localeCompare(a.date));
-            const today = new Date().toISOString().split('T')[0];
-            
-            for (let h of sorted) {
-                const done = h.done || 0;
-                const total = h.total || PLAN_ITEMS.length;
-                if (done >= total) {
-                    streak++;
-                } else {
-                    break;
-                }
-            }
-            
-            document.getElementById('planStreak').textContent = streak;
-            
-            // Метка периода
-            const labels = {
-                'day': 'за сегодня',
-                'week': 'за неделю',
-                'month': 'за месяц',
-                'all': 'за всё время'
-            };
-            document.getElementById('planPeriodLabel').textContent = labels[period] || 'за сегодня';
-            
-            // История
-            renderPlanHistory(filtered);
-            
-            // График
-            renderPlanChart(filtered);
-        }
-
-        function renderPlanHistory(filtered) {
-            const container = document.getElementById('planHistory');
-            
-            if (filtered.length === 0) {
-                container.innerHTML = '<p style="text-align:center;color:var(--text-secondary);padding:20px;">📭 Нет данных</p>';
-                return;
-            }
-            
-            // Показываем последние 14 дней
-            const show = filtered.slice(-14).reverse();
-            
-            let html = '';
-            show.forEach(h => {
-                const date = new Date(h.date + 'T00:00:00');
-                const dateStr = date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
-                const done = h.done || 0;
-                const total = h.total || PLAN_ITEMS.length;
-                const isFull = done >= total;
-                
-                html += `
-                    <div class="history-item">
-                        <span class="h-date">${dateStr}</span>
-                        <div class="h-details">
-                            ${Object.entries(h.items || {}).map(([id, val]) => {
-                                const item = PLAN_ITEMS.find(i => i.id === id);
-                                if (!item) return '';
-                                const isDone = val.done || val.count > 0;
-                                return `<span class="h-detail ${isDone ? 'done' : 'pending'}">${isDone ? '✅' : '◻️'} ${item.icon}</span>`;
-                            }).join('')}
-                        </div>
-                        <span class="h-total ${isFull ? 'good' : 'bad'}">${done}/${total}</span>
-                    </div>
-                `;
-            });
-            
-            container.innerHTML = html;
-        }
-
-        function renderPlanChart(filtered) {
-            const ctx = document.getElementById('planChart').getContext('2d');
-            if (planChart) planChart.destroy();
-            
-            if (filtered.length === 0) {
-                planChart = new Chart(ctx, {
-                    type: 'bar',
-                    data: { 
-                        labels: ['Нет данных'], 
-                        datasets: [{ label: 'Выполнено', data: [0], backgroundColor: 'rgba(255,255,255,0.05)' }] 
-                    },
-                    options: { 
-                        responsive: true, 
-                        maintainAspectRatio: false,
-                        plugins: { legend: { display: false } },
-                        scales: {
-                            y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(255,255,255,0.4)' } },
-                            x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.4)' } }
-                        }
-                    }
-                });
-                return;
-            }
-            
-            const labels = filtered.map(h => {
-                const d = new Date(h.date + 'T00:00:00');
-                return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
-            });
-            
-            const doneData = filtered.map(h => h.done || 0);
-            const totalData = filtered.map(h => h.total || PLAN_ITEMS.length);
-            
-            planChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: '✅ Выполнено',
-                            data: doneData,
-                            backgroundColor: 'rgba(107, 203, 119, 0.6)',
-                            borderColor: '#6BCB77',
-                            borderWidth: 1,
-                            borderRadius: 4,
-                            barPercentage: 0.6
-                        },
-                        {
-                            label: '📋 Всего',
-                            data: totalData,
-                            backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                            borderColor: 'rgba(255, 255, 255, 0.2)',
-                            borderWidth: 1,
-                            borderRadius: 4,
-                            barPercentage: 0.6
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: 'bottom',
-                            labels: { 
-                                usePointStyle: true, 
-                                padding: 12, 
-                                color: 'rgba(255,255,255,0.6)',
-                                font: { size: 10 }
-                            }
-                        }
-                    },
-                    scales: {
-                        y: { 
-                            beginAtZero: true, 
-                            grid: { color: 'rgba(255,255,255,0.05)' }, 
-                            ticks: { color: 'rgba(255,255,255,0.4)', stepSize: 1 } 
-                        },
-                        x: { 
-                            grid: { display: false }, 
-                            ticks: { color: 'rgba(255,255,255,0.4)', font: { size: 10 } } 
-                        }
-                    }
-                }
-            });
-        }
-
-        // ============ ПЕРИОД ============
-        function setPeriod(period) {
-            currentPeriod = period;
-            document.querySelectorAll('.period-btn').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.period === period);
-            });
-            updatePlanStats(period);
-        }
-
-        // ============ TELEGRAM ============
-        const tg = window.Telegram?.WebApp;
-        if (tg) {
-            tg.expand();
-            tg.ready();
-            const user = tg.initDataUnsafe?.user;
-            if (user) {
-                userId = user.id;
-                document.getElementById('userName').textContent = user.first_name || 'Гость';
-                document.getElementById('userAvatar').textContent = (user.first_name || 'Г')[0].toUpperCase();
-            }
-        }
-        
-        // ============ DATE ============
-        document.getElementById('currentDate').textContent = new Date().toLocaleDateString('ru-RU', {
-            day: 'numeric', month: 'long'
-        });
-        
-        // ============ API ============
-        async function apiCall(url, options = {}) {
-            try {
-                const response = await fetch(url, {
-                    ...options,
-                    headers: { 'Content-Type': 'application/json', ...options.headers }
-                });
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                return await response.json();
-            } catch (error) {
-                showToast('Ошибка связи', 'error');
-                throw error;
-            }
-        }
-        
-        // ============ LOAD USER ============
-        async function loadUserData() {
-            if (!userId) {
-                userId = Date.now();
-                document.getElementById('userName').textContent = 'Тест';
-                document.getElementById('userAvatar').textContent = 'Т';
-            }
-            
-            try {
-                const data = await apiCall(`/api/user/${userId}`);
-                limits = data.limits;
-                const record = data.today_record || {};
-                userData = {
-                    protein: record.protein || 0,
-                    fat: record.fat || 0,
-                    carbs: record.carbs || 0,
-                    fiber: record.fiber || 0
-                };
-                
-                const fields = ['protein', 'fat', 'carbs', 'fiber'];
-                fields.forEach(f => {
-                    document.getElementById(`limit${f.charAt(0).toUpperCase() + f.slice(1)}Min`).textContent = limits[`${f}_min`];
-                    document.getElementById(`limit${f.charAt(0).toUpperCase() + f.slice(1)}Max`).textContent = limits[`${f}_max`];
-                    document.getElementById(`${f}MinLabel`).textContent = limits[`${f}_min`];
-                    document.getElementById(`${f}MaxLabel`).textContent = limits[`${f}_max`];
-                    document.getElementById(f).value = userData[f];
-                });
-                
-                updateStats();
-                updateProgressBars();
-                
-                loadPlanData();
-                loadPlanHistory();
-                updatePlanStats('day');
-                
-                // Загружаем сравнение если на вкладке
-                if (!document.getElementById('tabCompare').classList.contains('hidden')) {
-                    loadComparison();
-                }
-            } catch (error) {
-                showToast('Ошибка загрузки', 'error');
-            }
-        }
-        
-        // ============ UPDATE STATS ============
-        function updateStats() {
-            const fields = ['protein', 'fat', 'carbs', 'fiber'];
-            fields.forEach(f => {
-                const value = userData[f] || 0;
-                const min = limits[`${f}_min`] || 0;
-                const max = limits[`${f}_max`] || 1;
-                
-                document.getElementById(`stat${f.charAt(0).toUpperCase() + f.slice(1)}`).textContent = value;
-                
-                let statusText, statusClass;
-                if (value === 0) {
-                    statusText = '⚪';
-                    statusClass = 'empty';
-                } else if (value < min) {
-                    statusText = '⬇️';
-                    statusClass = 'warn';
-                } else if (value > max) {
-                    statusText = '⬆️';
-                    statusClass = 'over';
-                } else {
-                    statusText = '✅';
-                    statusClass = 'good';
-                }
-                
-                const el = document.getElementById(`status${f.charAt(0).toUpperCase() + f.slice(1)}`);
-                el.textContent = statusText;
-                el.className = `status ${statusClass}`;
-                
-                const statusBadge = document.getElementById(`${f}StatusText`);
-                const statusLabels = {
-                    'good': '✅ Норма',
-                    'under': '⬇️ Ниже',
-                    'over': '⬆️ Выше',
-                    'empty': '⚪ Не введено'
-                };
-                statusBadge.textContent = statusLabels[statusClass] || statusLabels.empty;
-                statusBadge.className = `status-badge ${statusClass}`;
-            });
-        }
-        
-        // ============ UPDATE PROGRESS ============
-        function updateProgressBars() {
-            const fields = ['protein', 'fat', 'carbs', 'fiber'];
-            const colors = ['#FF6B6B', '#FFD93D', '#6BCB77', '#4D96FF'];
-            fields.forEach((f, i) => {
-                const value = userData[f] || 0;
-                const max = limits[`${f}_max`] || 1;
-                const min = limits[`${f}_min`] || 0;
-                const percent = Math.min((value / max) * 100, 100);
-                
-                const bar = document.getElementById(`${f}Progress`);
-                bar.style.width = `${percent}%`;
-                
-                if (value === 0) {
-                    bar.style.background = 'rgba(255,255,255,0.1)';
-                } else if (value < min) {
-                    bar.style.background = '#FFD93D';
-                } else if (value > max) {
-                    bar.style.background = '#FF6B6B';
-                } else {
-                    bar.style.background = colors[i];
-                }
-            });
-        }
-        
-        // ============ SAVE ============
-        async function saveData() {
-            const data = {
-                user_id: userId,
-                protein: parseFloat(document.getElementById('protein').value) || 0,
-                fat: parseFloat(document.getElementById('fat').value) || 0,
-                carbs: parseFloat(document.getElementById('carbs').value) || 0,
-                fiber: parseFloat(document.getElementById('fiber').value) || 0
-            };
-            
-            try {
-                await apiCall('/api/save', {
-                    method: 'POST',
-                    body: JSON.stringify(data)
-                });
-                
-                userData = data;
-                updateStats();
-                updateProgressBars();
-                showToast('✅ Сохранено!', 'success');
-                
-                if (!document.getElementById('tabCompare').classList.contains('hidden')) {
-                    loadComparison();
-                }
-            } catch (error) {
-                showToast('❌ Ошибка', 'error');
-            }
-        }
-        
-        // ============ RESET ============
-        async function resetToday() {
-            if (!confirm('Сбросить данные за сегодня?')) return;
-            
-            const data = { user_id: userId, protein: 0, fat: 0, carbs: 0, fiber: 0 };
-            try {
-                await apiCall('/api/save', { method: 'POST', body: JSON.stringify(data) });
-                userData = data;
-                ['protein', 'fat', 'carbs', 'fiber'].forEach(f => document.getElementById(f).value = 0);
-                updateStats();
-                updateProgressBars();
-                showToast('🔄 Сброшено', 'success');
-                if (!document.getElementById('tabCompare').classList.contains('hidden')) {
-                    loadComparison();
-                }
-            } catch (error) {
-                showToast('❌ Ошибка', 'error');
-            }
-        }
-        
-        // ============ COMPARISON ============
-        async function loadComparison() {
-            try {
-                const data = await apiCall('/api/today');
-                renderComparison(data);
-                renderComparisonChart(data);
-            } catch (error) {
-                document.getElementById('comparisonContainer').innerHTML = 
-                    '<p style="text-align:center;color:var(--text-secondary);padding:20px;">❌ Ошибка</p>';
-            }
-        }
-        
-        function renderComparison(data) {
-            const container = document.getElementById('comparisonContainer');
-            if (!data || data.length === 0) {
-                container.innerHTML = '<p style="text-align:center;color:var(--text-secondary);padding:20px;">📭 Нет данных</p>';
-                return;
-            }
-            
-            let html = `<div style="overflow-x:auto;"><table class="comparison-table"><thead><tr>
-                <th>Участник</th><th>🍗</th><th>🧈</th><th>🍞</th><th>🥦</th><th>Статус</th>
-            </tr></thead><tbody>`;
-            
-            data.forEach(rec => {
-                const name = rec.first_name || rec.username || `User ${rec.user_id}`;
-                const total = rec.protein + rec.fat + rec.carbs + rec.fiber;
-                const isActive = total > 0;
-                
-                const getBadge = (status) => {
-                    const map = {
-                        'good': '<span class="badge good">✅</span>',
-                        'under': '<span class="badge under">⬇️</span>',
-                        'over': '<span class="badge over">⬆️</span>',
-                        'empty': '<span class="badge empty">⚪</span>'
-                    };
-                    return map[status] || map.empty;
-                };
-                
-                const statusMap = {
-                    'good': '✅ Норма',
-                    'under': '⬇️ Низкий',
-                    'over': '⬆️ Высокий',
-                    'empty': '⚪ Нет'
-                };
-                
-                html += `<tr>
-                    <td class="user-name">${isActive ? '🟢' : '⚪'} ${name}</td>
-                    <td>${rec.protein.toFixed(0)} ${getBadge(rec.protein_status)}</td>
-                    <td>${rec.fat.toFixed(0)} ${getBadge(rec.fat_status)}</td>
-                    <td>${rec.carbs.toFixed(0)} ${getBadge(rec.carbs_status)}</td>
-                    <td>${rec.fiber.toFixed(0)} ${getBadge(rec.fiber_status)}</td>
-                    <td>${statusMap[rec.overall_status] || '⚪'}</td>
-                </tr>`;
-            });
-            
-            html += `</tbody></table></div>`;
-            container.innerHTML = html;
-        }
-        
-        function renderComparisonChart(data) {
-            const ctx = document.getElementById('compareChart').getContext('2d');
-            if (compareChart) compareChart.destroy();
-            
-            if (!data || data.length === 0 || data.every(r => r.protein === 0 && r.fat === 0 && r.carbs === 0 && r.fiber === 0)) {
-                compareChart = new Chart(ctx, {
-                    type: 'bar',
-                    data: { labels: ['Нет данных'], datasets: [{ label: 'Нет записей', data: [0], backgroundColor: 'rgba(255,255,255,0.05)' }] },
-                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
-                });
-                return;
-            }
-            
-            const labels = data.map(r => r.first_name || r.username || `User ${r.user_id}`);
-            compareChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        { label: 'Белки', data: data.map(r => r.protein), backgroundColor: '#FF6B6B', borderRadius: 6, barPercentage: 0.6 },
-                        { label: 'Жиры', data: data.map(r => r.fat), backgroundColor: '#FFD93D', borderRadius: 6, barPercentage: 0.6 },
-                        { label: 'Углеводы', data: data.map(r => r.carbs), backgroundColor: '#6BCB77', borderRadius: 6, barPercentage: 0.6 },
-                        { label: 'Клетчатка', data: data.map(r => r.fiber), backgroundColor: '#4D96FF', borderRadius: 6, barPercentage: 0.6 }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: true, position: 'bottom', labels: { usePointStyle: true, padding: 16, color: 'rgba(255,255,255,0.6)' } }
-                    },
-                    scales: {
-                        x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.4)' } },
-                        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(255,255,255,0.4)' } }
-                    }
-                }
-            });
-        }
-        
-        // ============ TABS ============
-        function switchTab(tab) {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.getElementById('tabMy').classList.add('hidden');
-            document.getElementById('tabCompare').classList.add('hidden');
-            
-            if (tab === 'my') {
-                document.querySelector('.tab:first-child').classList.add('active');
-                document.getElementById('tabMy').classList.remove('hidden');
-            } else {
-                document.querySelector('.tab:last-child').classList.add('active');
-                document.getElementById('tabCompare').classList.remove('hidden');
-                loadComparison();
-                // Обновляем статистику плана
-                loadPlanHistory();
-                updatePlanStats(currentPeriod);
-            }
-        }
-        
-        // ============ TOAST ============
-        function showToast(message, type = 'info') {
-            const existing = document.querySelector('.toast');
-            if (existing) existing.remove();
-            
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            toast.textContent = message;
-            document.body.appendChild(toast);
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                toast.style.transition = 'opacity 0.3s';
-                setTimeout(() => toast.remove(), 300);
-            }, 2500);
-        }
-        
-        // ============ CLOSE ============
-        function closeApp() {
-            if (tg) tg.close();
-            else window.close();
-        }
-        
-        // ============ AUTO-SAVE ============
-        document.querySelectorAll('#tabMy .input-group input').forEach(input => {
-            input.addEventListener('change', () => {
-                userData[input.id] = parseFloat(input.value) || 0;
-                updateStats();
-                updateProgressBars();
-            });
-        });
-
-        // Обработка ввода чисел в плане
-        document.addEventListener('input', function(e) {
-            if (e.target.classList.contains('input-count')) {
-                const el = e.target.closest('.plan-item');
-                const val = parseInt(e.target.value);
-                if (val > 0) {
-                    el.classList.remove('pending');
-                    el.classList.add('done');
-                    el.querySelector('.status').textContent = '✅';
-                } else {
-                    el.classList.remove('done');
-                    el.classList.add('pending');
-                    el.querySelector('.status').textContent = '◻️';
-                }
-                updatePlanProgress();
-                savePlanData();
-                // Обновляем статистику если на вкладке сравнения
-                if (!document.getElementById('tabCompare').classList.contains('hidden')) {
-                    loadPlanHistory();
-                    updatePlanStats(currentPeriod);
-                }
-            }
-        });
-        
-        // ============ INIT ============
-        loadUserData();
-        
-        setInterval(() => {
-            if (!document.getElementById('tabCompare').classList.contains('hidden')) {
-                loadComparison();
-                loadPlanHistory();
-                updatePlanStats(currentPeriod);
-            }
-        }, 30000);
-
-            <!-- ===== КНОПКА ЗАКРЫТИЯ (исправленная) ===== -->
-    <button class="tg-button" onclick="closeApp()">✖️ Закрыть</button>
-
-    <script>
-        // ============ ИСПРАВЛЕННОЕ ЗАКРЫТИЕ ============
-        function closeApp() {
-            // Сначала сохраняем данные
-            saveDataBeforeClose();
-            
-            // Закрываем WebApp
-            if (window.Telegram && window.Telegram.WebApp) {
-                window.Telegram.WebApp.close();
-            } else {
-                // Если не в Telegram — просто закрываем окно
-                window.close();
-            }
-        }
-
-        function saveDataBeforeClose() {
-            // Собираем все данные
-            const data = {
-                user_id: userId,
-                protein: parseFloat(document.getElementById('protein').value) || 0,
-                fat: parseFloat(document.getElementById('fat').value) || 0,
-                carbs: parseFloat(document.getElementById('carbs').value) || 0,
-                fiber: parseFloat(document.getElementById('fiber').value) || 0
-            };
-            
-            // Сохраняем в localStorage (на случай, если сервер недоступен)
-            localStorage.setItem('bzu_data_' + userId, JSON.stringify(data));
-            
-            // Отправляем на сервер
-            fetch('/api/save', {
+        try {
+            const response = await fetch('/api/plan/save', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
-            })
-            .then(response => response.json())
-            .then(result => {
-                console.log('✅ Данные сохранены перед закрытием:', result);
-            })
-            .catch(error => {
-                console.error('❌ Ошибка сохранения:', error);
-                // Данные уже в localStorage, не теряются
             });
-        }
-
-        // ============ АВТОСОХРАНЕНИЕ ПРИ ВВОДЕ ============
-        document.querySelectorAll('#tabMy .input-group input').forEach(input => {
-            input.addEventListener('change', function() {
-                const data = {
-                    user_id: userId,
-                    protein: parseFloat(document.getElementById('protein').value) || 0,
-                    fat: parseFloat(document.getElementById('fat').value) || 0,
-                    carbs: parseFloat(document.getElementById('carbs').value) || 0,
-                    fiber: parseFloat(document.getElementById('fiber').value) || 0
-                };
-                
-                // Сохраняем в localStorage при каждом изменении
-                localStorage.setItem('bzu_data_' + userId, JSON.stringify(data));
-            });
-        });
-
-        // ============ ЗАГРУЗКА ДАННЫХ ПРИ ОТКРЫТИИ ============
-        function loadSavedData() {
-            const saved = localStorage.getItem('bzu_data_' + userId);
-            if (saved) {
-                try {
-                    const data = JSON.parse(saved);
-                    
-                    document.getElementById('protein').value = data.protein || 0;
-                    document.getElementById('fat').value = data.fat || 0;
-                    document.getElementById('carbs').value = data.carbs || 0;
-                    document.getElementById('fiber').value = data.fiber || 0;
-                    
-                    // Обновляем статистику
-                    userData = data;
-                    updateStats();
-                    updateProgressBars();
-                    
-                    console.log('✅ Данные загружены из localStorage:', data);
-                } catch (e) {
-                    console.error('❌ Ошибка загрузки:', e);
-                }
-            }
-        }
-
-        // ============ ПЕРЕХВАТ ЗАКРЫТИЯ (на случай, если закрывают через свайп) ============
-        document.addEventListener('visibilitychange', function() {
-            if (document.visibilityState === 'hidden') {
-                saveDataBeforeClose();
-            }
-        });
-
-        // ============ ПРИ ЗАГРУЗКЕ ============
-        // После загрузки пользователя загружаем сохранённые данные
-        // Вызови эту функцию после loadUserData()
-        // loadSavedData();
-
-        // ============ ОБНОВЛЁННАЯ ЗАГРУЗКА ПОЛЬЗОВАТЕЛЯ ============
-        // Замени существующую loadUserData на эту
-        async function loadUserData() {
-            if (!userId) {
-                userId = Date.now();
-                document.getElementById('userName').textContent = 'Тест';
-                document.getElementById('userAvatar').textContent = 'Т';
-            }
             
-            try {
-                const data = await apiCall(`/api/user/${userId}`);
-                limits = data.limits;
-                const record = data.today_record || {};
-                userData = {
-                    protein: record.protein || 0,
-                    fat: record.fat || 0,
-                    carbs: record.carbs || 0,
-                    fiber: record.fiber || 0
-                };
+            if (response.ok) {
+                console.log('✅ План сохранён на сервер');
+            } else {
+                console.error('❌ Ошибка сохранения плана');
+            }
+        } catch (error) {
+            console.error('❌ Ошибка:', error);
+        }
+    }
+    
+    // ============ ЗАГРУЗКА ПЛАНА С СЕРВЕРА ============
+    async function loadPlanFromServer() {
+        try {
+            const response = await fetch(`/api/plan/get/${userId}`);
+            const data = await response.json();
+            
+            if (data.plan && Object.keys(data.plan).length > 0) {
+                const plan = data.plan;
                 
-                const fields = ['protein', 'fat', 'carbs', 'fiber'];
-                fields.forEach(f => {
-                    document.getElementById(`limit${f.charAt(0).toUpperCase() + f.slice(1)}Min`).textContent = limits[`${f}_min`];
-                    document.getElementById(`limit${f.charAt(0).toUpperCase() + f.slice(1)}Max`).textContent = limits[`${f}_max`];
-                    document.getElementById(`${f}MinLabel`).textContent = limits[`${f}_min`];
-                    document.getElementById(`${f}MaxLabel`).textContent = limits[`${f}_max`];
-                    document.getElementById(f).value = userData[f];
+                document.querySelectorAll('.plan-item').forEach(el => {
+                    const id = el.dataset.id;
+                    if (plan[id]) {
+                        if (plan[id].done) {
+                            el.classList.remove('pending');
+                            el.classList.add('done');
+                            el.querySelector('.status').textContent = '✅';
+                        } else {
+                            el.classList.remove('done');
+                            el.classList.add('pending');
+                            el.querySelector('.status').textContent = '◻️';
+                        }
+                        
+                        const input = el.querySelector('.input-count');
+                        if (input && plan[id].count) {
+                            input.value = plan[id].count;
+                        }
+                    }
                 });
                 
-                updateStats();
-                updateProgressBars();
-                
-                // Загружаем план
-                loadPlanData();
-                loadPlanHistory();
-                updatePlanStats('day');
-                
-                // Загружаем сохранённые данные из localStorage (если есть)
-                loadSavedData();
-                
-                // Если не в Telegram — подставляем тестовое имя
-                if (!tg) {
-                    document.getElementById('userName').textContent = 'Тест';
-                    document.getElementById('userAvatar').textContent = 'Т';
-                }
-                
-            } catch (error) {
-                showToast('Ошибка загрузки', 'error');
+                updatePlanProgress();
+                console.log('✅ План загружен с сервера');
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('❌ Ошибка загрузки плана:', error);
+            return false;
+        }
+    }
+    
+    // ============ ФУНКЦИИ ПЛАНА ============
+    function togglePlan(el) {
+        const isDone = el.classList.contains('done');
+        
+        if (isDone) {
+            el.classList.remove('done');
+            el.classList.add('pending');
+            el.querySelector('.status').textContent = '◻️';
+        } else {
+            el.classList.remove('pending');
+            el.classList.add('done');
+            el.querySelector('.status').textContent = '✅';
+        }
+        
+        const input = el.querySelector('.input-count');
+        if (input) {
+            const val = parseInt(input.value);
+            if (val > 0) {
+                // сохраняем
             }
         }
-    </script>
+        
+        updatePlanProgress();
+        savePlanData();
+        
+        // Сохраняем на сервер
+        savePlanToServer();
+    }
+    
+    function updatePlanProgress() {
+        const items = document.querySelectorAll('.plan-item');
+        const done = document.querySelectorAll('.plan-item.done');
+        const total = items.length;
+        const count = done.length;
+        
+        const badge = document.getElementById('planProgress');
+        badge.textContent = `${count}/${total}`;
+        
+        if (count === total) {
+            badge.className = 'badge-done';
+        } else {
+            badge.className = 'badge-pending';
+        }
+    }
+    
+    function getPlanData() {
+        const items = document.querySelectorAll('.plan-item');
+        const data = {};
+        
+        items.forEach(el => {
+            const id = el.dataset.id;
+            const isDone = el.classList.contains('done');
+            const input = el.querySelector('.input-count');
+            const count = input ? parseInt(input.value) || 0 : 0;
+            
+            data[id] = {
+                done: isDone,
+                count: count
+            };
+        });
+        
+        return data;
+    }
+    
+    function savePlanData() {
+        const data = getPlanData();
+        localStorage.setItem('plan_data_' + userId, JSON.stringify(data));
+    }
+    
+    function loadPlanData() {
+        const saved = localStorage.getItem('plan_data_' + userId);
+        if (saved) {
+            try {
+                const data = JSON.parse(saved);
+                
+                document.querySelectorAll('.plan-item').forEach(el => {
+                    const id = el.dataset.id;
+                    if (data[id]) {
+                        if (data[id].done) {
+                            el.classList.remove('pending');
+                            el.classList.add('done');
+                            el.querySelector('.status').textContent = '✅';
+                        } else {
+                            el.classList.remove('done');
+                            el.classList.add('pending');
+                            el.querySelector('.status').textContent = '◻️';
+                        }
+                        
+                        const input = el.querySelector('.input-count');
+                        if (input && data[id].count) {
+                            input.value = data[id].count;
+                        }
+                    }
+                });
+                
+                updatePlanProgress();
+            } catch (e) {
+                console.error('Ошибка загрузки плана:', e);
+            }
+        }
+    }
+    
+    // ============ ИСТОРИЯ ПЛАНА ============
+    function loadPlanHistory() {
+        const history = localStorage.getItem('plan_history_' + userId);
+        if (history) {
+            try {
+                allPlanHistory = JSON.parse(history);
+            } catch (e) {
+                allPlanHistory = [];
+            }
+        } else {
+            allPlanHistory = [];
+        }
+    }
+    
+    function getFilteredHistory(period) {
+        const today = new Date();
+        let cutoff = new Date(today);
+        
+        switch(period) {
+            case 'day':
+                cutoff.setDate(cutoff.getDate() - 1);
+                break;
+            case 'week':
+                cutoff.setDate(cutoff.getDate() - 7);
+                break;
+            case 'month':
+                cutoff.setMonth(cutoff.getMonth() - 1);
+                break;
+            case 'all':
+            default:
+                cutoff = new Date(2000, 0, 1);
+                break;
+        }
+        
+        const cutoffStr = cutoff.toISOString().split('T')[0];
+        return allPlanHistory.filter(h => h.date >= cutoffStr);
+    }
+    
+    function updatePlanStats(period) {
+        const filtered = getFilteredHistory(period);
+        
+        if (filtered.length === 0) {
+            document.getElementById('planTotalDone').textContent = '0';
+            document.getElementById('planTotalItems').textContent = '0';
+            document.getElementById('planPercent').textContent = '0%';
+            document.getElementById('planStreak').textContent = '0';
+            document.getElementById('planHistory').innerHTML = 
+                '<p style="text-align:center;color:var(--text-secondary);padding:20px;">📭 Нет данных за этот период</p>';
+            return;
+        }
+        
+        let totalDone = 0;
+        let totalItems = 0;
+        
+        filtered.forEach(h => {
+            totalDone += h.done || 0;
+            totalItems += h.total || PLAN_ITEMS.length;
+        });
+        
+        const avgDone = totalDone / filtered.length;
+        const avgTotal = totalItems / filtered.length;
+        const percent = avgTotal > 0 ? Math.round((avgDone / avgTotal) * 100) : 0;
+        
+        document.getElementById('planTotalDone').textContent = Math.round(avgDone);
+        document.getElementById('planTotalItems').textContent = Math.round(avgTotal);
+        document.getElementById('planPercent').textContent = percent + '%';
+        
+        let streak = 0;
+        const sorted = [...allPlanHistory].sort((a, b) => b.date.localeCompare(a.date));
+        
+        for (let h of sorted) {
+            const done = h.done || 0;
+            const total = h.total || PLAN_ITEMS.length;
+            if (done >= total) {
+                streak++;
+            } else {
+                break;
+            }
+        }
+        
+        document.getElementById('planStreak').textContent = streak;
+        
+        const labels = {
+            'day': 'за сегодня',
+            'week': 'за неделю',
+            'month': 'за месяц',
+            'all': 'за всё время'
+        };
+        document.getElementById('planPeriodLabel').textContent = labels[period] || 'за сегодня';
+        
+        renderPlanHistory(filtered);
+        renderPlanChart(filtered);
+    }
+    
+    function renderPlanHistory(filtered) {
+        const container = document.getElementById('planHistory');
+        
+        if (filtered.length === 0) {
+            container.innerHTML = '<p style="text-align:center;color:var(--text-secondary);padding:20px;">📭 Нет данных</p>';
+            return;
+        }
+        
+        const show = filtered.slice(-14).reverse();
+        
+        let html = '';
+        show.forEach(h => {
+            const date = new Date(h.date + 'T00:00:00');
+            const dateStr = date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+            const done = h.done || 0;
+            const total = h.total || PLAN_ITEMS.length;
+            const isFull = done >= total;
+            
+            html += `
+                <div class="history-item">
+                    <span class="h-date">${dateStr}</span>
+                    <div class="h-details">
+                        ${Object.entries(h.items || {}).map(([id, val]) => {
+                            const item = PLAN_ITEMS.find(i => i.id === id);
+                            if (!item) return '';
+                            const isDone = val.done || val.count > 0;
+                            return `<span class="h-detail ${isDone ? 'done' : 'pending'}">${isDone ? '✅' : '◻️'} ${item.icon}</span>`;
+                        }).join('')}
+                    </div>
+                    <span class="h-total ${isFull ? 'good' : 'bad'}">${done}/${total}</span>
+                </div>
+            `;
+        });
+        
+        container.innerHTML = html;
+    }
+    
+    function renderPlanChart(filtered) {
+        const ctx = document.getElementById('planChart').getContext('2d');
+        if (planChart) planChart.destroy();
+        
+        if (filtered.length === 0) {
+            planChart = new Chart(ctx, {
+                type: 'bar',
+                data: { 
+                    labels: ['Нет данных'], 
+                    datasets: [{ label: 'Выполнено', data: [0], backgroundColor: 'rgba(255,255,255,0.05)' }] 
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(255,255,255,0.4)' } },
+                        x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.4)' } }
+                    }
+                }
+            });
+            return;
+        }
+        
+        const labels = filtered.map(h => {
+            const d = new Date(h.date + 'T00:00:00');
+            return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+        });
+        
+        const doneData = filtered.map(h => h.done || 0);
+        const totalData = filtered.map(h => h.total || PLAN_ITEMS.length);
+        
+        planChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: '✅ Выполнено',
+                        data: doneData,
+                        backgroundColor: 'rgba(107, 203, 119, 0.6)',
+                        borderColor: '#6BCB77',
+                        borderWidth: 1,
+                        borderRadius: 4,
+                        barPercentage: 0.6
+                    },
+                    {
+                        label: '📋 Всего',
+                        data: totalData,
+                        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                        borderColor: 'rgba(255, 255, 255, 0.2)',
+                        borderWidth: 1,
+                        borderRadius: 4,
+                        barPercentage: 0.6
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'bottom',
+                        labels: { 
+                            usePointStyle: true, 
+                            padding: 12, 
+                            color: 'rgba(255,255,255,0.6)',
+                            font: { size: 10 }
+                        }
+                    }
+                },
+                scales: {
+                    y: { 
+                        beginAtZero: true, 
+                        grid: { color: 'rgba(255,255,255,0.05)' }, 
+                        ticks: { color: 'rgba(255,255,255,0.4)', stepSize: 1 } 
+                    },
+                    x: { 
+                        grid: { display: false }, 
+                        ticks: { color: 'rgba(255,255,255,0.4)', font: { size: 10 } } 
+                    }
+                }
+            }
+        });
+    }
+    
+    function setPeriod(period) {
+        currentPeriod = period;
+        document.querySelectorAll('.period-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.period === period);
+        });
+        updatePlanStats(period);
+    }
+    
+    // ============ СОХРАНЕНИЕ БЖУ ============
+    async function saveData() {
+        const data = {
+            user_id: userId,
+            protein: parseFloat(document.getElementById('protein').value) || 0,
+            fat: parseFloat(document.getElementById('fat').value) || 0,
+            carbs: parseFloat(document.getElementById('carbs').value) || 0,
+            fiber: parseFloat(document.getElementById('fiber').value) || 0
+        };
+        
+        try {
+            await apiCall('/api/save', {
+                method: 'POST',
+                body: JSON.stringify(data)
+            });
+            
+            userData = data;
+            updateStats();
+            updateProgressBars();
+            showToast('✅ Сохранено!', 'success');
+            
+            if (!document.getElementById('tabCompare').classList.contains('hidden')) {
+                loadComparison();
+            }
+        } catch (error) {
+            showToast('❌ Ошибка', 'error');
+        }
+    }
+    
+    // ============ ЗАКРЫТИЕ ============
+    function closeApp() {
+        // Сохраняем план на сервер
+        savePlanToServer();
+        
+        // Сохраняем БЖУ
+        const data = {
+            user_id: userId,
+            protein: parseFloat(document.getElementById('protein').value) || 0,
+            fat: parseFloat(document.getElementById('fat').value) || 0,
+            carbs: parseFloat(document.getElementById('carbs').value) || 0,
+            fiber: parseFloat(document.getElementById('fiber').value) || 0
+        };
+        
+        fetch('/api/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        }).catch(() => {});
+        
+        // Закрываем WebApp
+        if (window.Telegram && window.Telegram.WebApp) {
+            window.Telegram.WebApp.close();
+        } else {
+            window.close();
+        }
+    }
+    
+    // ============ TELEGRAM ============
+    const tg = window.Telegram?.WebApp;
+    if (tg) {
+        tg.expand();
+        tg.ready();
+        const user = tg.initDataUnsafe?.user;
+        if (user) {
+            userId = user.id;
+            document.getElementById('userName').textContent = user.first_name || 'Гость';
+            document.getElementById('userAvatar').textContent = (user.first_name || 'Г')[0].toUpperCase();
+        }
+    }
+    
+    // ============ DATE ============
+    document.getElementById('currentDate').textContent = new Date().toLocaleDateString('ru-RU', {
+        day: 'numeric', month: 'long'
+    });
+    
+    // ============ API ============
+    async function apiCall(url, options = {}) {
+        try {
+            const response = await fetch(url, {
+                ...options,
+                headers: { 'Content-Type': 'application/json', ...options.headers }
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return await response.json();
+        } catch (error) {
+            showToast('Ошибка связи', 'error');
+            throw error;
+        }
+    }
+    
+    // ============ LOAD USER ============
+    async function loadUserData() {
+        if (!userId) {
+            userId = Date.now();
+            document.getElementById('userName').textContent = 'Тест';
+            document.getElementById('userAvatar').textContent = 'Т';
+        }
+        
+        try {
+            const data = await apiCall(`/api/user/${userId}`);
+            limits = data.limits;
+            const record = data.today_record || {};
+            userData = {
+                protein: record.protein || 0,
+                fat: record.fat || 0,
+                carbs: record.carbs || 0,
+                fiber: record.fiber || 0
+            };
+            
+            const fields = ['protein', 'fat', 'carbs', 'fiber'];
+            fields.forEach(f => {
+                document.getElementById(`limit${f.charAt(0).toUpperCase() + f.slice(1)}Min`).textContent = limits[`${f}_min`];
+                document.getElementById(`limit${f.charAt(0).toUpperCase() + f.slice(1)}Max`).textContent = limits[`${f}_max`];
+                document.getElementById(`${f}MinLabel`).textContent = limits[`${f}_min`];
+                document.getElementById(`${f}MaxLabel`).textContent = limits[`${f}_max`];
+                document.getElementById(f).value = userData[f];
+            });
+            
+            updateStats();
+            updateProgressBars();
+            
+            // Загружаем план с сервера (основной способ)
+            const loaded = await loadPlanFromServer();
+            
+            // Если с сервера не загрузилось — пробуем из localStorage
+            if (!loaded) {
+                loadPlanData();
+            }
+            
+            loadPlanHistory();
+            updatePlanStats('day');
+            
+            if (!document.getElementById('tabCompare').classList.contains('hidden')) {
+                loadComparison();
+            }
+        } catch (error) {
+            showToast('Ошибка загрузки', 'error');
+        }
+    }
+    
+    // ============ UPDATE STATS ============
+    function updateStats() {
+        const fields = ['protein', 'fat', 'carbs', 'fiber'];
+        fields.forEach(f => {
+            const value = userData[f] || 0;
+            const min = limits[`${f}_min`] || 0;
+            const max = limits[`${f}_max`] || 1;
+            
+            document.getElementById(`stat${f.charAt(0).toUpperCase() + f.slice(1)}`).textContent = value;
+            
+            let statusText, statusClass;
+            if (value === 0) {
+                statusText = '⚪';
+                statusClass = 'empty';
+            } else if (value < min) {
+                statusText = '⬇️';
+                statusClass = 'warn';
+            } else if (value > max) {
+                statusText = '⬆️';
+                statusClass = 'over';
+            } else {
+                statusText = '✅';
+                statusClass = 'good';
+            }
+            
+            const el = document.getElementById(`status${f.charAt(0).toUpperCase() + f.slice(1)}`);
+            el.textContent = statusText;
+            el.className = `status ${statusClass}`;
+            
+            const statusBadge = document.getElementById(`${f}StatusText`);
+            const statusLabels = {
+                'good': '✅ Норма',
+                'under': '⬇️ Ниже',
+                'over': '⬆️ Выше',
+                'empty': '⚪ Не введено'
+            };
+            statusBadge.textContent = statusLabels[statusClass] || statusLabels.empty;
+            statusBadge.className = `status-badge ${statusClass}`;
+        });
+    }
+    
+    // ============ UPDATE PROGRESS ============
+    function updateProgressBars() {
+        const fields = ['protein', 'fat', 'carbs', 'fiber'];
+        const colors = ['#FF6B6B', '#FFD93D', '#6BCB77', '#4D96FF'];
+        fields.forEach((f, i) => {
+            const value = userData[f] || 0;
+            const max = limits[`${f}_max`] || 1;
+            const min = limits[`${f}_min`] || 0;
+            const percent = Math.min((value / max) * 100, 100);
+            
+            const bar = document.getElementById(`${f}Progress`);
+            bar.style.width = `${percent}%`;
+            
+            if (value === 0) {
+                bar.style.background = 'rgba(255,255,255,0.1)';
+            } else if (value < min) {
+                bar.style.background = '#FFD93D';
+            } else if (value > max) {
+                bar.style.background = '#FF6B6B';
+            } else {
+                bar.style.background = colors[i];
+            }
+        });
+    }
+    
+    // ============ RESET ============
+    async function resetToday() {
+        if (!confirm('Сбросить данные за сегодня?')) return;
+        
+        const data = { user_id: userId, protein: 0, fat: 0, carbs: 0, fiber: 0 };
+        try {
+            await apiCall('/api/save', { method: 'POST', body: JSON.stringify(data) });
+            userData = data;
+            ['protein', 'fat', 'carbs', 'fiber'].forEach(f => document.getElementById(f).value = 0);
+            updateStats();
+            updateProgressBars();
+            showToast('🔄 Сброшено', 'success');
+            if (!document.getElementById('tabCompare').classList.contains('hidden')) {
+                loadComparison();
+            }
+        } catch (error) {
+            showToast('❌ Ошибка', 'error');
+        }
+    }
+    
+    // ============ COMPARISON ============
+    async function loadComparison() {
+        try {
+            const data = await apiCall('/api/today');
+            renderComparison(data);
+            renderComparisonChart(data);
+        } catch (error) {
+            document.getElementById('comparisonContainer').innerHTML = 
+                '<p style="text-align:center;color:var(--text-secondary);padding:20px;">❌ Ошибка</p>';
+        }
+    }
+    
+    function renderComparison(data) {
+        const container = document.getElementById('comparisonContainer');
+        if (!data || data.length === 0) {
+            container.innerHTML = '<p style="text-align:center;color:var(--text-secondary);padding:20px;">📭 Нет данных</p>';
+            return;
+        }
+        
+        let html = `<div style="overflow-x:auto;"><table class="comparison-table"><thead><tr>
+            <th>Участник</th><th>🍗</th><th>🧈</th><th>🍞</th><th>🥦</th><th>Статус</th>
+        </tr></thead><tbody>`;
+        
+        data.forEach(rec => {
+            const name = rec.first_name || rec.username || `User ${rec.user_id}`;
+            const total = rec.protein + rec.fat + rec.carbs + rec.fiber;
+            const isActive = total > 0;
+            
+            const getBadge = (status) => {
+                const map = {
+                    'good': '<span class="badge good">✅</span>',
+                    'under': '<span class="badge under">⬇️</span>',
+                    'over': '<span class="badge over">⬆️</span>',
+                    'empty': '<span class="badge empty">⚪</span>'
+                };
+                return map[status] || map.empty;
+            };
+            
+            const statusMap = {
+                'good': '✅ Норма',
+                'under': '⬇️ Низкий',
+                'over': '⬆️ Высокий',
+                'empty': '⚪ Нет'
+            };
+            
+            html += `<tr>
+                <td class="user-name">${isActive ? '🟢' : '⚪'} ${name}</td>
+                <td>${rec.protein.toFixed(0)} ${getBadge(rec.protein_status)}</td>
+                <td>${rec.fat.toFixed(0)} ${getBadge(rec.fat_status)}</td>
+                <td>${rec.carbs.toFixed(0)} ${getBadge(rec.carbs_status)}</td>
+                <td>${rec.fiber.toFixed(0)} ${getBadge(rec.fiber_status)}</td>
+                <td>${statusMap[rec.overall_status] || '⚪'}</td>
+            </tr>`;
+        });
+        
+        html += `</tbody></table></div>`;
+        container.innerHTML = html;
+    }
+    
+    function renderComparisonChart(data) {
+        const ctx = document.getElementById('compareChart').getContext('2d');
+        if (compareChart) compareChart.destroy();
+        
+        if (!data || data.length === 0 || data.every(r => r.protein === 0 && r.fat === 0 && r.carbs === 0 && r.fiber === 0)) {
+            compareChart = new Chart(ctx, {
+                type: 'bar',
+                data: { labels: ['Нет данных'], datasets: [{ label: 'Нет записей', data: [0], backgroundColor: 'rgba(255,255,255,0.05)' }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            });
+            return;
+        }
+        
+        const labels = data.map(r => r.first_name || r.username || `User ${r.user_id}`);
+        compareChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    { label: 'Белки', data: data.map(r => r.protein), backgroundColor: '#FF6B6B', borderRadius: 6, barPercentage: 0.6 },
+                    { label: 'Жиры', data: data.map(r => r.fat), backgroundColor: '#FFD93D', borderRadius: 6, barPercentage: 0.6 },
+                    { label: 'Углеводы', data: data.map(r => r.carbs), backgroundColor: '#6BCB77', borderRadius: 6, barPercentage: 0.6 },
+                    { label: 'Клетчатка', data: data.map(r => r.fiber), backgroundColor: '#4D96FF', borderRadius: 6, barPercentage: 0.6 }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: true, position: 'bottom', labels: { usePointStyle: true, padding: 16, color: 'rgba(255,255,255,0.6)' } }
+                },
+                scales: {
+                    x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.4)' } },
+                    y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(255,255,255,0.4)' } }
+                }
+            }
+        });
+    }
+    
+    // ============ TABS ============
+    function switchTab(tab) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.getElementById('tabMy').classList.add('hidden');
+        document.getElementById('tabCompare').classList.add('hidden');
+        
+        if (tab === 'my') {
+            document.querySelector('.tab:first-child').classList.add('active');
+            document.getElementById('tabMy').classList.remove('hidden');
+        } else {
+            document.querySelector('.tab:last-child').classList.add('active');
+            document.getElementById('tabCompare').classList.remove('hidden');
+            loadComparison();
+            loadPlanHistory();
+            updatePlanStats(currentPeriod);
+        }
+    }
+    
+    // ============ TOAST ============
+    function showToast(message, type = 'info') {
+        const existing = document.querySelector('.toast');
+        if (existing) existing.remove();
+        
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transition = 'opacity 0.3s';
+            setTimeout(() => toast.remove(), 300);
+        }, 2500);
+    }
+    
+    // ============ CLOSE ============
+    function closeApp() {
+        // Сохраняем план на сервер
+        savePlanToServer();
+        
+        // Сохраняем БЖУ
+        const data = {
+            user_id: userId,
+            protein: parseFloat(document.getElementById('protein').value) || 0,
+            fat: parseFloat(document.getElementById('fat').value) || 0,
+            carbs: parseFloat(document.getElementById('carbs').value) || 0,
+            fiber: parseFloat(document.getElementById('fiber').value) || 0
+        };
+        
+        fetch('/api/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        }).catch(() => {});
+        
+        // Закрываем WebApp
+        if (window.Telegram && window.Telegram.WebApp) {
+            window.Telegram.WebApp.close();
+        } else {
+            window.close();
+        }
+    }
+    
+    // ============ AUTO-SAVE ============
+    document.querySelectorAll('#tabMy .input-group input').forEach(input => {
+        input.addEventListener('change', () => {
+            userData[input.id] = parseFloat(input.value) || 0;
+            updateStats();
+            updateProgressBars();
+        });
+    });
+    
+    document.addEventListener('input', function(e) {
+        if (e.target.classList.contains('input-count')) {
+            const el = e.target.closest('.plan-item');
+            const val = parseInt(e.target.value);
+            if (val > 0) {
+                el.classList.remove('pending');
+                el.classList.add('done');
+                el.querySelector('.status').textContent = '✅';
+            } else {
+                el.classList.remove('done');
+                el.classList.add('pending');
+                el.querySelector('.status').textContent = '◻️';
+            }
+            updatePlanProgress();
+            savePlanData();
+            savePlanToServer();
+            if (!document.getElementById('tabCompare').classList.contains('hidden')) {
+                loadPlanHistory();
+                updatePlanStats(currentPeriod);
+            }
+        }
+    });
+    
+    // ============ INIT ============
+    loadUserData();
+    
+    setInterval(() => {
+        if (!document.getElementById('tabCompare').classList.contains('hidden')) {
+            loadComparison();
+            loadPlanHistory();
+            updatePlanStats(currentPeriod);
+        }
+    }, 30000);
+</script>
 </body>
 </html>
