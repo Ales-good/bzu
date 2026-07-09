@@ -167,9 +167,12 @@ async def update_limits_endpoint(data: LimitsData):
 @app.post("/api/plan/save")
 async def save_plan(data: PlanData):
     try:
+        print(f"📥 Сохраняем план для user_id={data.user_id}")
+        print(f"📊 Данные: {data.plan_data}")
         save_plan_record(data.user_id, data.plan_data, data.record_date)
         return {"status": "success", "message": "План сохранен"}
     except Exception as e:
+        print(f"❌ Ошибка: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/api/plan/get/{user_id}")
