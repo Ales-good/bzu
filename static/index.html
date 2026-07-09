@@ -895,20 +895,37 @@
 
         async function savePlanToServer() {
             if (!userId) return;
+            
+            // Проверяем, что пользователь создан
+            try {
+                const check = await fetch(`/api/user/${userId}`);
+                if (!check.ok) {
+                    console.log('⏳ Пользователь ещё не создан, создаём...');
+                    await fetch(`/api/user/${userId}?first_name=${encodeURIComponent(userName)}`);
+                }
+            } catch (e) {
+                console.error('❌ Ошибка проверки пользователя:', e);
+                return;
+            }
+            
             const planData = getPlanData();
             const today = new Date().toISOString().split('T')[0];
             try {
-                await fetch('/api/plan/save', {
+                const response = await fetch('/api/plan/save', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ user_id: userId, plan_data: planData, record_date: today })
                 });
-                console.log('✅ План сохранён');
+                if (response.ok) {
+                    console.log('✅ План сохранён');
+                } else {
+                    const err = await response.json();
+                    console.error('❌ Ошибка сохранения плана:', err);
+                }
             } catch (error) {
-                console.error('❌ Ошибка сохранения плана:', error);
+                console.error('❌ Ошибка:', error);
             }
         }
-
         async function loadPlanFromServer() {
             if (!userId) return false;
             try {
@@ -1123,13 +1140,13 @@
                 document.getElementById('userAvatar').textContent = 'Т';
                 return;
             }
-
+        
             try {
-                // Передаём имя на сервер
+                // 1. Сначала СОЗДАЁМ пользователя (или получаем существующего)
                 const url = `/api/user/${userId}?first_name=${encodeURIComponent(userName)}`;
                 const data = await apiCall(url);
                 if (!data) return;
-
+        
                 limits = data.limits;
                 const record = data.today_record || {};
                 userData = {
@@ -1139,7 +1156,7 @@
                     fiber: record.fiber || 0,
                     calories: record.calories || 0
                 };
-
+        
                 const fields = ['protein', 'fat', 'carbs', 'fiber', 'calories'];
                 fields.forEach(f => {
                     document.getElementById(f).value = userData[f] || 0;
@@ -1148,11 +1165,13 @@
                     document.getElementById(`${f}MinLabel`).textContent = limits[`${f}_min`] || 0;
                     document.getElementById(`${f}MaxLabel`).textContent = limits[`${f}_max`] || 0;
                 });
-
+        
                 updateStats();
                 updateProgressBars();
+        
+                // 2. ТЕПЕРЬ загружаем план (пользователь уже точно существует!)
                 await loadPlanFromServer();
-
+        
                 if (!document.getElementById('tabCompare').classList.contains('hidden')) {
                     loadHistory(currentDays);
                     loadComparison();
