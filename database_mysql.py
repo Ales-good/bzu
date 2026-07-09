@@ -107,14 +107,21 @@ def init_db():
     conn.close()
 
 # ============ ПОЛЬЗОВАТЕЛИ ============
+
 def update_user_name(user_id: int, first_name: str):
+    """Обновляет имя пользователя"""
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute('''
-        UPDATE users SET first_name = %s WHERE user_id = %s
-    ''', (first_name, user_id))
-    conn.commit()
-    conn.close()
+    try:
+        cursor.execute('''
+            UPDATE users SET first_name = %s WHERE user_id = %s
+        ''', (first_name, user_id))
+        conn.commit()
+        print(f"✅ Обновлено имя пользователя {user_id}: {first_name}")
+    except Exception as e:
+        print(f"❌ Ошибка обновления имени: {e}")
+    finally:
+        conn.close()
     
 def get_or_create_user(user_id: int, username: str = None, first_name: str = None, last_name: str = None) -> Dict:
     conn = get_db()
@@ -137,6 +144,12 @@ def get_or_create_user(user_id: int, username: str = None, first_name: str = Non
         conn.commit()
         cursor.execute("SELECT * FROM users WHERE user_id = %s", (user_id,))
         user = cursor.fetchone()
+        print(f"✅ Создан новый пользователь: {user_id} - {first_name}")
+    else:
+        # Если пользователь существует, но имя не совпадает - обновляем
+        if first_name and user.get('first_name') != first_name:
+            update_user_name(user_id, first_name)
+            user['first_name'] = first_name
     
     conn.close()
     return user
@@ -172,6 +185,7 @@ def save_bzu_record(user_id: int, protein: float, fat: float, carbs: float, fibe
     
     conn.commit()
     conn.close()
+    print(f"✅ Сохранена запись БЖУ для user_id={user_id} на {record_date}")
 
 def get_today_records() -> List[Dict]:
     today = date.today().isoformat()
@@ -315,7 +329,7 @@ def save_plan_record(user_id: int, plan_data: dict, record_date: str = None):
     
     conn = get_db()
     cursor = conn.cursor()
-    plan_json = json.dumps(plan_data)
+    plan_json = json.dumps(plan_data, ensure_ascii=False)
     
     cursor.execute('''
         INSERT INTO plan_records (user_id, record_date, plan_data)
@@ -327,6 +341,7 @@ def save_plan_record(user_id: int, plan_data: dict, record_date: str = None):
     
     conn.commit()
     conn.close()
+    print(f"✅ Сохранен план для user_id={user_id} на {record_date}")
 
 def get_plan_record(user_id: int, record_date: str = None) -> Optional[Dict]:
     if not record_date:
@@ -343,8 +358,11 @@ def get_plan_record(user_id: int, record_date: str = None) -> Optional[Dict]:
     record = cursor.fetchone()
     conn.close()
     
-    if record:
-        return json.loads(record['plan_data'])
+    if record and record.get('plan_data'):
+        try:
+            return json.loads(record['plan_data'])
+        except:
+            return {}
     return None
 
 def get_plan_history(user_id: int, days: int = 90) -> List[Dict]:
@@ -365,7 +383,10 @@ def get_plan_history(user_id: int, days: int = 90) -> List[Dict]:
     result = []
     for rec in records:
         rec_dict = dict(rec)
-        rec_dict['plan_data'] = json.loads(rec_dict['plan_data'])
+        try:
+            rec_dict['plan_data'] = json.loads(rec_dict['plan_data'])
+        except:
+            rec_dict['plan_data'] = {}
         result.append(rec_dict)
     
     return result
