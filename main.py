@@ -9,6 +9,7 @@ import json
 import threading
 from datetime import date
 import os
+import asyncio
 
 from database_mysql import (
     init_db, get_or_create_user, save_bzu_record, 
@@ -23,7 +24,7 @@ init_db()
 print("✅ БД готова")
 
 # ============ НАСТРОЙКИ ============
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "8704240954:AAG4AV6Wrt_9aQhn400ljcWTNq80gc0LpWM")
+TELEGRAM_TOKEN = "8704240954:AAG4AV6Wrt_9aQhn400ljcWTNq80gc0LpWM"
 WEBAPP_URL = os.getenv("WEBAPP_URL", "https://bzu-production.up.railway.app")
 
 app = FastAPI()
@@ -261,25 +262,41 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(message, parse_mode='HTML')
 
 def run_bot():
+    """Запускает Telegram бота с обработкой ошибок"""
     try:
         print(f"🤖 Запуск бота с токеном: {TELEGRAM_TOKEN[:10]}...")
+        
+        # Создаём новый event loop для этого потока
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        # Создаём приложение
         bot_app = Application.builder().token(TELEGRAM_TOKEN).build()
+        
+        # Добавляем обработчики команд
         bot_app.add_handler(CommandHandler("start", start))
         bot_app.add_handler(CommandHandler("help", help_command))
         bot_app.add_handler(CommandHandler("stats", stats_command))
+        
         print("✅ Обработчики команд добавлены")
         print("🤖 Бот запущен и ожидает сообщения...")
+        
+        # Запускаем polling
         bot_app.run_polling(allowed_updates=["message", "callback_query"])
+        
     except Exception as e:
         print(f"❌ ОШИБКА в run_bot(): {e}")
         import traceback
         traceback.print_exc()
 
-# ============ ЗАПУСК БОТА (для Railway) ============
+# ============ ЗАПУСК БОТА ============
 print("🚀 Railway: запускаю бота...")
 
-if not TELEGRAM_TOKEN or TELEGRAM_TOKEN == "ВАШ_ТОКЕН_ОТ_BOTFATHER":
-    print("❌ ОШИБКА: TELEGRAM_TOKEN не задан или используется заглушка!")
+if not TELEGRAM_TOKEN:
+    print("❌ ОШИБКА: TELEGRAM_TOKEN не задан!")
 else:
     print(f"✅ TELEGRAM_TOKEN задан: {TELEGRAM_TOKEN[:10]}...")
     print("🔄 Запускаю бота в отдельном потоке...")
