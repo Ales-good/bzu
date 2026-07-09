@@ -204,22 +204,42 @@ async def get_history(user_id: int, days: int = 90):
     plan_history = get_plan_history(user_id, days)
     
     # Создаём словарь для быстрого доступа к данным по датам
-    plan_dict = {p['record_date']: p['plan_data'] for p in plan_history}
+    plan_dict = {}
+    for p in plan_history:
+        date_str = p['record_date'].isoformat() if hasattr(p['record_date'], 'isoformat') else str(p['record_date'])
+        plan_dict[date_str] = p['plan_data']
     
     dates = []
     calories = []
+    protein = []
+    fat = []
+    carbs = []
+    fiber = []
     plan_completed = []
     plan_total = []
+    plan_data_list = []  # Сохраняем все планы для графиков
     
     for record in bzu_history:
-        date_str = record['record_date'].isoformat() if hasattr(record['record_date'], 'isoformat') else record['record_date']
+        date_str = record['record_date']
         dates.append(date_str)
         calories.append(float(record['calories']) if record['calories'] else 0)
+        protein.append(float(record['protein']) if record['protein'] else 0)
+        fat.append(float(record['fat']) if record['fat'] else 0)
+        carbs.append(float(record['carbs']) if record['carbs'] else 0)
+        fiber.append(float(record['fiber']) if record['fiber'] else 0)
         
         # Считаем выполнение плана на эту дату
         plan_data = plan_dict.get(date_str, {})
+        plan_data_list.append(plan_data)  # Сохраняем для графиков
+        
         total_items = len(plan_data)
-        completed_items = sum(1 for v in plan_data.values() if v.get('done', False) or v.get('count', 0) > 0)
+        completed_items = 0
+        for v in plan_data.values():
+            if isinstance(v, dict):
+                if v.get('done', False) or v.get('count', 0) > 0:
+                    completed_items += 1
+            elif v:  # если просто True/False
+                completed_items += 1 if v else 0
         
         plan_total.append(total_items)
         plan_completed.append(completed_items)
@@ -227,8 +247,13 @@ async def get_history(user_id: int, days: int = 90):
     return {
         "dates": dates,
         "calories": calories,
+        "protein": protein,
+        "fat": fat,
+        "carbs": carbs,
+        "fiber": fiber,
         "plan_completed": plan_completed,
-        "plan_total": plan_total
+        "plan_total": plan_total,
+        "plan_data": plan_data_list  # Добавляем для детальных графиков
     }
 
 # ============ ТЕЛЕГРАМ БОТ ============
