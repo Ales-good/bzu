@@ -14,7 +14,7 @@
             --bg: #0F0F1A;
             --card: rgba(255,255,255,0.05);
             --card-border: rgba(255,255,255,0.08);
-            --text: #FFFFFF;АМ
+            --text: #FFFFFF;
             --text-secondary: rgba(255,255,255,0.6);
             --shadow: 0 8px 32px rgba(0,0,0,0.4);
             --radius: 20px;
@@ -546,6 +546,12 @@
             transform: translateX(-50%) scale(0.97);
             background: rgba(255,255,255,0.08);
         }
+        .tg-button.sync {
+            bottom: 80px;
+            background: rgba(77,150,255,0.15);
+            border-color: rgba(77,150,255,0.3);
+            color: #4D96FF;
+        }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
@@ -591,7 +597,7 @@
         <h1>🍽️ БЖУ</h1>
         <div class="user-badge">
             <div class="avatar" id="userAvatar">?</div>
-            <span class="name" id="userName">Гость</span>
+            <span class="name" id="userName">Загрузка...</span>
         </div>
     </div>
 
@@ -601,7 +607,6 @@
     </div>
 
     <div id="tabMy">
-        <!-- План -->
         <div class="card">
             <div class="card-title">
                 🏆 План выполнения
@@ -660,7 +665,6 @@
             </div>
         </div>
 
-        <!-- БЖУ -->
         <div class="card">
             <div class="card-title">
                 📅 Сегодня
@@ -766,7 +770,6 @@
             <button class="btn-secondary" onclick="resetToday()">🔄 Сбросить</button>
         </div>
 
-        <!-- Stats -->
         <div class="card">
             <div class="card-title">📊 Итог</div>
             <div class="stats-grid">
@@ -799,7 +802,6 @@
         </div>
     </div>
 
-    <!-- Tab Compare -->
     <div id="tabCompare" class="hidden">
         <div class="card">
             <div class="card-title">📊 Аналитика</div>
@@ -840,30 +842,17 @@
         </div>
     </div>
 
+    <button class="tg-button sync" onclick="syncTelegram()">🔄 Синхронизировать с Telegram</button>
     <button class="tg-button" onclick="closeApp()">✖️ Закрыть</button>
 
     <script>
-        const API_URL = window.location.origin;
-        let userId = null;
-        let userName = 'Гость';
-        let userData = { protein: 0, fat: 0, carbs: 0, fiber: 0, calories: 0 };
-        let limits = {
-            protein_min: 150, protein_max: 200,
-            fat_min: 70, fat_max: 80,
-            carbs_min: 80, carbs_max: 100,
-            fiber_min: 10, fiber_max: 20,
-            calories_min: 2000, calories_max: 2500
-        };
-        let currentDays = 7;
-        let saveTimeoutId = null;
-        let selectedUsers = [];
-
         // ============ TELEGRAM ============
         const tg = window.Telegram?.WebApp;
         let userId = null;
         let userName = 'Гость';
         let isTelegramUser = false;
-        
+
+        // ПЫТАЕМСЯ ПОЛУЧИТЬ ПОЛЬЗОВАТЕЛЯ ИЗ TELEGRAM
         if (tg) {
             try {
                 tg.expand();
@@ -873,44 +862,62 @@
                     userId = user.id;
                     userName = user.first_name || 'Гость';
                     isTelegramUser = true;
-                    console.log('✅ Пользователь из Telegram:', { userId, userName });
-                    
-                    // Сохраняем в localStorage
+                    console.log('✅ Telegram пользователь:', userId, userName);
                     localStorage.setItem('bzu_user_id', userId);
                     localStorage.setItem('bzu_user_name', userName);
-                } else {
-                    console.warn('⚠️ Telegram есть, но пользователь не получен');
                 }
-            } catch (e) {
+            } catch(e) {
                 console.error('❌ Ошибка Telegram:', e);
             }
         }
-        
-        // ТОЛЬКО если НЕТ Telegram ИЛИ НЕТ пользователя - создаем нового
+
+        // ЕСЛИ НЕТ TELEGRAM - БЕРЕМ ИЗ LOCALSTORAGE
         if (!userId) {
             const savedId = localStorage.getItem('bzu_user_id');
             if (savedId) {
                 userId = parseInt(savedId);
                 userName = localStorage.getItem('bzu_user_name') || 'Гость';
-                console.log('📦 Загружено из localStorage:', { userId, userName });
-            } else {
-                // НЕ СОЗДАЕМ НОВОГО! Ждем Telegram
-                console.warn('⚠️ Нет пользователя, ждем Telegram...');
-                userId = null;
-                userName = 'Гость';
+                console.log('📦 Из localStorage:', userId, userName);
             }
         }
-        
-        // Обновляем UI только если есть пользователь
-        if (userId) {
-            document.getElementById('userName').textContent = userName;
-            document.getElementById('userAvatar').textContent = userName[0].toUpperCase();
-        } else {
-            document.getElementById('userName').textContent = 'Загрузка...';
-            document.getElementById('userAvatar').textContent = '?';
+
+        // ЕСЛИ ВСЕ ЕЩЕ НЕТ - СОЗДАЕМ ВРЕМЕННОГО
+        if (!userId) {
+            userId = Date.now();
+            userName = 'Гость';
+            localStorage.setItem('bzu_user_id', userId);
+            localStorage.setItem('bzu_user_name', userName);
+            console.log('🆕 Создан временный:', userId);
         }
-        
-        console.log('👤 Финальный пользователь:', { userId, userName, isTelegramUser });
+
+        document.getElementById('userName').textContent = userName;
+        document.getElementById('userAvatar').textContent = userName[0].toUpperCase();
+
+        console.log('👤 Итоговый пользователь:', { userId, userName, isTelegramUser });
+
+        // ============ ФУНКЦИЯ СИНХРОНИЗАЦИИ ============
+        function syncTelegram() {
+            if (tg) {
+                const user = tg.initDataUnsafe?.user;
+                if (user && user.id) {
+                    userId = user.id;
+                    userName = user.first_name || 'Гость';
+                    isTelegramUser = true;
+                    localStorage.setItem('bzu_user_id', userId);
+                    localStorage.setItem('bzu_user_name', userName);
+                    document.getElementById('userName').textContent = userName;
+                    document.getElementById('userAvatar').textContent = userName[0].toUpperCase();
+                    showToast(`✅ Синхронизировано! Привет, ${userName}!`, 'success');
+                    loadUserData();
+                } else {
+                    showToast('❌ Не удалось получить данные из Telegram', 'error');
+                }
+            } else {
+                showToast('❌ Это не Telegram WebApp', 'error');
+            }
+        }
+
+        document.getElementById('currentDate').textContent = new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
 
         // ============ API ============
         async function apiCall(url, options = {}) {
@@ -1048,73 +1055,31 @@
                 } catch(e) { console.log('Не удалось закрыть'); }
             }, 300);
         }
-        function syncTelegram() {
-            if (tg) {
-                const user = tg.initDataUnsafe?.user;
-                if (user && user.id) {
-                    userId = user.id;
-                    userName = user.first_name || 'Гость';
-                    localStorage.setItem('bzu_user_id', userId);
-                    localStorage.setItem('bzu_user_name', userName);
-                    document.getElementById('userName').textContent = userName;
-                    document.getElementById('userAvatar').textContent = userName[0].toUpperCase();
-                    showToast(`✅ Синхронизировано с ${userName}`, 'success');
-                    loadUserData();
-                } else {
-                    showToast('❌ Не удалось получить данные из Telegram', 'error');
-                }
-            } else {
-                showToast('❌ Не Telegram WebApp', 'error');
-            }
-        }
 
-        <button class="tg-button" onclick="syncTelegram()" style="margin-top: 10px; background: rgba(77,150,255,0.15); border-color: rgba(77,150,255,0.3); color: #4D96FF;">
-            🔄 Синхронизировать с Telegram
-        </button>
         // ============ БЖУ ============
+        let limits = {
+            protein_min: 150, protein_max: 200,
+            fat_min: 70, fat_max: 80,
+            carbs_min: 80, carbs_max: 100,
+            fiber_min: 10, fiber_max: 20,
+            calories_min: 2000, calories_max: 2500
+        };
+        let userData = { protein: 0, fat: 0, carbs: 0, fiber: 0, calories: 0 };
+        let currentDays = 7;
+        let saveTimeoutId = null;
+
         async function loadUserData() {
-            console.log('📥 loadUserData() вызван');
-            
-            // ЕСЛИ НЕТ USER_ID - НЕ ЗАГРУЖАЕМ!
             if (!userId) {
-                console.warn('⚠️ Нет userId, ждем...');
-                // Пробуем получить из Telegram снова через 2 секунды
-                setTimeout(() => {
-                    if (tg) {
-                        const user = tg.initDataUnsafe?.user;
-                        if (user && user.id) {
-                            userId = user.id;
-                            userName = user.first_name || 'Гость';
-                            localStorage.setItem('bzu_user_id', userId);
-                            localStorage.setItem('bzu_user_name', userName);
-                            document.getElementById('userName').textContent = userName;
-                            document.getElementById('userAvatar').textContent = userName[0].toUpperCase();
-                            loadUserData(); // Повторно загружаем
-                        }
-                    }
-                }, 2000);
+                showToast('❌ Нет пользователя, нажмите "Синхронизировать"', 'error');
                 return;
             }
-        
+            
             try {
-                console.log('📥 Загружаем данные для userId:', userId);
+                console.log('📥 Загружаем данные для:', userId);
                 const data = await apiCall(`/api/user/${userId}`);
-                if (!data) {
-                    console.error('❌ Не удалось загрузить пользователя');
-                    return;
-                }
-        
-                console.log('✅ Данные загружены:', data);
-                
-                // Обновляем имя если нужно
-                if (data.user && data.user.first_name && data.user.first_name !== 'Гость') {
-                    userName = data.user.first_name;
-                    document.getElementById('userName').textContent = userName;
-                    document.getElementById('userAvatar').textContent = userName[0].toUpperCase();
-                    localStorage.setItem('bzu_user_name', userName);
-                }
-                
-                limits = data.limits || limits;
+                if (!data) return;
+
+                limits = data.limits;
                 const record = data.today_record || {};
                 userData = {
                     protein: record.protein || 0,
@@ -1123,27 +1088,20 @@
                     fiber: record.fiber || 0,
                     calories: record.calories || 0
                 };
-        
+
                 const fields = ['protein', 'fat', 'carbs', 'fiber', 'calories'];
                 fields.forEach(f => {
-                    const input = document.getElementById(f);
-                    if (input) input.value = userData[f] || 0;
-                    
-                    const minEl = document.getElementById(`limit${f.charAt(0).toUpperCase() + f.slice(1)}Min`);
-                    const maxEl = document.getElementById(`limit${f.charAt(0).toUpperCase() + f.slice(1)}Max`);
-                    const minLabel = document.getElementById(`${f}MinLabel`);
-                    const maxLabel = document.getElementById(`${f}MaxLabel`);
-                    
-                    if (minEl) minEl.textContent = limits[`${f}_min`] || 0;
-                    if (maxEl) maxEl.textContent = limits[`${f}_max`] || 0;
-                    if (minLabel) minLabel.textContent = limits[`${f}_min`] || 0;
-                    if (maxLabel) maxLabel.textContent = limits[`${f}_max`] || 0;
+                    document.getElementById(f).value = userData[f] || 0;
+                    document.getElementById(`limit${f.charAt(0).toUpperCase() + f.slice(1)}Min`).textContent = limits[`${f}_min`] || 0;
+                    document.getElementById(`limit${f.charAt(0).toUpperCase() + f.slice(1)}Max`).textContent = limits[`${f}_max`] || 0;
+                    document.getElementById(`${f}MinLabel`).textContent = limits[`${f}_min`] || 0;
+                    document.getElementById(`${f}MaxLabel`).textContent = limits[`${f}_max`] || 0;
                 });
-        
+
                 updateStats();
                 updateProgressBars();
                 await loadPlanFromServer();
-        
+
                 if (!document.getElementById('tabCompare').classList.contains('hidden')) {
                     loadAnalytics(currentDays);
                 }
@@ -1151,7 +1109,6 @@
                 if (userName !== 'Гость') {
                     showToast(`👋 Привет, ${userName}!`, 'success');
                 }
-                
             } catch (error) {
                 console.error('❌ Ошибка загрузки:', error);
             }
@@ -1276,357 +1233,21 @@
                 const users = await apiCall('/api/users');
                 if (!users) return;
 
-                const activeUsers = [];
-                for (const user of users) {
-                    const history = await apiCall(`/api/history/${user.user_id}?days=${days}`);
-                    if (history && history.dates && history.dates.length > 0) {
-                        const hasData = history.calories.some(c => c > 0);
-                        if (hasData) {
-                            activeUsers.push(user);
-                        }
-                    }
-                }
-
                 const userSelector = document.getElementById('userSelector');
-                userSelector.innerHTML = '';
+                userSelector.innerHTML = '<span style="color: var(--text-secondary); font-size: 14px;">Загрузка...</span>';
 
-                if (activeUsers.length === 0) {
-                    userSelector.innerHTML = '<span style="color: var(--text-secondary); font-size: 14px;">📭 Нет активных пользователей</span>';
-                    return;
-                }
-
-                selectedUsers = [];
-                activeUsers.forEach((user, index) => {
-                    const chip = document.createElement('span');
-                    chip.className = 'user-chip';
-                    chip.dataset.userId = user.user_id;
-                    chip.textContent = user.first_name || `User ${user.user_id}`;
-                    
-                    const isCurrent = user.user_id === userId;
-                    if (isCurrent || (selectedUsers.length === 0 && index === 0)) {
-                        chip.classList.add('active');
-                        selectedUsers.push(user.user_id);
-                    }
-                    
-                    chip.onclick = function() {
-                        this.classList.toggle('active');
-                        const id = parseInt(this.dataset.userId);
-                        const idx = selectedUsers.indexOf(id);
-                        if (idx > -1) {
-                            selectedUsers.splice(idx, 1);
-                        } else {
-                            selectedUsers.push(id);
-                        }
-                        if (selectedUsers.length > 0) {
-                            loadAllCharts(days);
-                        }
-                    };
-                    
-                    userSelector.appendChild(chip);
+                // Просто показываем пользователей
+                let html = '';
+                users.forEach(user => {
+                    const name = user.first_name || `User ${user.user_id}`;
+                    const isActive = user.user_id === userId;
+                    html += `<span class="user-chip ${isActive ? 'active' : ''}" data-userid="${user.user_id}">${name}</span>`;
                 });
+                userSelector.innerHTML = html;
 
-                if (selectedUsers.length > 0) {
-                    await loadAllCharts(days);
-                }
             } catch (error) {
                 console.error('❌ Ошибка загрузки аналитики:', error);
             }
-        }
-
-        async function loadAllCharts(days) {
-            if (selectedUsers.length === 0) return;
-            
-            const allData = {};
-            const userNames = {};
-            
-            const users = await apiCall('/api/users');
-            if (users) {
-                users.forEach(u => {
-                    userNames[u.user_id] = u.first_name || `User ${u.user_id}`;
-                });
-            }
-            
-            for (const uid of selectedUsers) {
-                const history = await apiCall(`/api/history/${uid}?days=${days}`);
-                if (history && history.dates && history.dates.length > 0) {
-                    allData[uid] = history;
-                }
-            }
-            
-            if (Object.keys(allData).length === 0) return;
-            
-            renderCaloriesChart(allData, userNames);
-            renderBZUChart(allData, userNames);
-            renderExercisesChart(allData, userNames);
-            renderConditionsChart(allData, userNames);
-        }
-
-        function renderCaloriesChart(allData, userNames) {
-            const ctx = document.getElementById('caloriesChart').getContext('2d');
-            if (caloriesChart) caloriesChart.destroy();
-            
-            const datasets = [];
-            const colors = ['#FF6B6B', '#4D96FF', '#6BCB77', '#FFD93D', '#FF9F43', '#A29BFE', '#FD79A8', '#00CEC9'];
-            let allLabels = [];
-            
-            Object.keys(allData).forEach((uid, index) => {
-                const data = allData[uid];
-                if (data && data.dates && data.dates.length > 0) {
-                    if (allLabels.length === 0) {
-                        allLabels = data.dates.map(d => {
-                            const parts = d.split('-');
-                            return `${parts[2]}.${parts[1]}`;
-                        });
-                    }
-                    datasets.push({
-                        label: userNames[uid] || `User ${uid}`,
-                        data: data.calories || [],
-                        borderColor: colors[index % colors.length],
-                        backgroundColor: colors[index % colors.length] + '20',
-                        fill: true,
-                        tension: 0.4,
-                        pointRadius: 3,
-                        pointHoverRadius: 6
-                    });
-                }
-            });
-            
-            if (datasets.length === 0) {
-                datasets.push({ label: 'Нет данных', data: [0], borderColor: '#666', fill: true, tension: 0.4 });
-                allLabels = ['Нет данных'];
-            }
-            
-            caloriesChart = new Chart(ctx, {
-                type: 'line',
-                data: { labels: allLabels, datasets: datasets },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: 'top',
-                            labels: { color: 'rgba(255,255,255,0.6)', font: { size: 10 } }
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function(ctx) {
-                                    return ctx.dataset.label + ': ' + ctx.parsed.y + ' ккал';
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(255,255,255,0.4)' } },
-                        x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.4)', maxTicksLimit: 20 } }
-                    }
-                }
-            });
-        }
-
-        function renderBZUChart(allData, userNames) {
-            const ctx = document.getElementById('bzuChart').getContext('2d');
-            if (bzuChart) bzuChart.destroy();
-            
-            const labels = [];
-            const proteinData = [];
-            const fatData = [];
-            const carbsData = [];
-            const fiberData = [];
-            
-            Object.keys(allData).forEach(uid => {
-                const data = allData[uid];
-                if (data && data.dates && data.dates.length > 0) {
-                    const lastIndex = data.dates.length - 1;
-                    const protein = data.protein ? data.protein[lastIndex] || 0 : 0;
-                    const fat = data.fat ? data.fat[lastIndex] || 0 : 0;
-                    const carbs = data.carbs ? data.carbs[lastIndex] || 0 : 0;
-                    const fiber = data.fiber ? data.fiber[lastIndex] || 0 : 0;
-                    
-                    if (protein > 0 || fat > 0 || carbs > 0 || fiber > 0) {
-                        labels.push(userNames[uid] || `User ${uid}`);
-                        proteinData.push(protein);
-                        fatData.push(fat);
-                        carbsData.push(carbs);
-                        fiberData.push(fiber);
-                    }
-                }
-            });
-            
-            if (labels.length === 0) {
-                labels.push('Нет данных');
-                proteinData.push(0); fatData.push(0); carbsData.push(0); fiberData.push(0);
-            }
-            
-            bzuChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        { label: '🍗 Белки (г)', data: proteinData, backgroundColor: 'rgba(255,107,107,0.8)', borderColor: '#FF6B6B', borderWidth: 2, borderRadius: 4 },
-                        { label: '🧈 Жиры (г)', data: fatData, backgroundColor: 'rgba(255,217,61,0.8)', borderColor: '#FFD93D', borderWidth: 2, borderRadius: 4 },
-                        { label: '🍞 Углеводы (г)', data: carbsData, backgroundColor: 'rgba(107,203,119,0.8)', borderColor: '#6BCB77', borderWidth: 2, borderRadius: 4 },
-                        { label: '🥦 Клетчатка (г)', data: fiberData, backgroundColor: 'rgba(77,150,255,0.8)', borderColor: '#4D96FF', borderWidth: 2, borderRadius: 4 }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: 'top',
-                            labels: { color: 'rgba(255,255,255,0.6)', font: { size: 10 } }
-                        }
-                    },
-                    scales: {
-                        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(255,255,255,0.4)' } },
-                        x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.4)' } }
-                    }
-                }
-            });
-        }
-
-        function renderExercisesChart(allData, userNames) {
-            const ctx = document.getElementById('exercisesChart').getContext('2d');
-            if (exercisesChart) exercisesChart.destroy();
-            
-            const labels = [];
-            const pushupsData = [];
-            const squatsData = [];
-            const absData = [];
-            
-            Object.keys(allData).forEach(uid => {
-                const data = allData[uid];
-                if (data && data.plan_data && data.plan_data.length > 0) {
-                    let lastData = null;
-                    for (let i = data.plan_data.length - 1; i >= 0; i--) {
-                        const plan = data.plan_data[i];
-                        if (plan && (plan.pushups || plan.squats || plan.abs)) {
-                            lastData = plan;
-                            break;
-                        }
-                    }
-                    if (lastData) {
-                        const pushups = lastData.pushups?.count || 0;
-                        const squats = lastData.squats?.count || 0;
-                        const abs = lastData.abs?.count || 0;
-                        if (pushups > 0 || squats > 0 || abs > 0) {
-                            labels.push(userNames[uid] || `User ${uid}`);
-                            pushupsData.push(pushups);
-                            squatsData.push(squats);
-                            absData.push(abs);
-                        }
-                    }
-                }
-            });
-            
-            if (labels.length === 0) {
-                labels.push('Нет данных');
-                pushupsData.push(0); squatsData.push(0); absData.push(0);
-            }
-            
-            exercisesChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        { label: '💪 Отжимания (шт)', data: pushupsData, backgroundColor: 'rgba(255,107,107,0.8)', borderColor: '#FF6B6B', borderWidth: 2, borderRadius: 4 },
-                        { label: '🦵 Приседания (шт)', data: squatsData, backgroundColor: 'rgba(77,150,255,0.8)', borderColor: '#4D96FF', borderWidth: 2, borderRadius: 4 },
-                        { label: '🔥 Пресс (шт)', data: absData, backgroundColor: 'rgba(255,217,61,0.8)', borderColor: '#FFD93D', borderWidth: 2, borderRadius: 4 }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: 'top',
-                            labels: { color: 'rgba(255,255,255,0.6)', font: { size: 10 } }
-                        }
-                    },
-                    scales: {
-                        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(255,255,255,0.4)' } },
-                        x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.4)' } }
-                    }
-                }
-            });
-        }
-
-        function renderConditionsChart(allData, userNames) {
-            const ctx = document.getElementById('conditionsChart').getContext('2d');
-            if (conditionsChart) conditionsChart.destroy();
-            
-            const labels = [];
-            const massageData = [];
-            const banyaData = [];
-            const poolData = [];
-            const noFoodData = [];
-            const gymData = [];
-            
-            Object.keys(allData).forEach(uid => {
-                const data = allData[uid];
-                if (data && data.plan_data && data.plan_data.length > 0) {
-                    let lastData = null;
-                    for (let i = data.plan_data.length - 1; i >= 0; i--) {
-                        const plan = data.plan_data[i];
-                        if (plan && (plan.massage || plan.banya || plan.pool || plan.no_food || plan.gym)) {
-                            lastData = plan;
-                            break;
-                        }
-                    }
-                    if (lastData) {
-                        const massage = lastData.massage?.done ? 1 : 0;
-                        const banya = lastData.banya?.done ? 1 : 0;
-                        const pool = lastData.pool?.done ? 1 : 0;
-                        const noFood = lastData.no_food?.done ? 1 : 0;
-                        const gym = lastData.gym?.done ? 1 : 0;
-                        if (massage + banya + pool + noFood + gym > 0) {
-                            labels.push(userNames[uid] || `User ${uid}`);
-                            massageData.push(massage);
-                            banyaData.push(banya);
-                            poolData.push(pool);
-                            noFoodData.push(noFood);
-                            gymData.push(gym);
-                        }
-                    }
-                }
-            });
-            
-            if (labels.length === 0) {
-                labels.push('Нет данных');
-                massageData.push(0); banyaData.push(0); poolData.push(0); noFoodData.push(0); gymData.push(0);
-            }
-            
-            conditionsChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        { label: '💆 Массаж', data: massageData, backgroundColor: 'rgba(255,107,107,0.8)', borderColor: '#FF6B6B', borderWidth: 2, borderRadius: 4 },
-                        { label: '🧖 Баня', data: banyaData, backgroundColor: 'rgba(255,217,61,0.8)', borderColor: '#FFD93D', borderWidth: 2, borderRadius: 4 },
-                        { label: '🏊 Бассейн', data: poolData, backgroundColor: 'rgba(77,150,255,0.8)', borderColor: '#4D96FF', borderWidth: 2, borderRadius: 4 },
-                        { label: '⏰ Не ел после 18', data: noFoodData, backgroundColor: 'rgba(107,203,119,0.8)', borderColor: '#6BCB77', borderWidth: 2, borderRadius: 4 },
-                        { label: '🏋️ Зал', data: gymData, backgroundColor: 'rgba(162,155,254,0.8)', borderColor: '#A29BFE', borderWidth: 2, borderRadius: 4 }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: 'top',
-                            labels: { color: 'rgba(255,255,255,0.6)', font: { size: 10 } }
-                        }
-                    },
-                    scales: {
-                        y: { beginAtZero: true, max: 1, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: 'rgba(255,255,255,0.4)', stepSize: 1, callback: function(value) { return value === 1 ? '✅' : '❌'; } } },
-                        x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.4)' } }
-                    }
-                }
-            });
         }
 
         function setPeriod(days) {
@@ -1634,7 +1255,6 @@
             document.querySelectorAll('.period-btn').forEach(btn => {
                 btn.classList.toggle('active', parseInt(btn.dataset.period) === days);
             });
-            loadAnalytics(days);
         }
 
         // ============ TABS ============
@@ -1680,6 +1300,7 @@
 
         // ============ INIT ============
         loadUserData();
+        
         setInterval(() => {
             if (!document.getElementById('tabCompare').classList.contains('hidden')) {
                 loadAnalytics(currentDays);
