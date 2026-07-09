@@ -11,6 +11,16 @@ import time
 import asyncio
 from datetime import date
 
+
+
+from database_mysql import (
+    init_db, get_or_create_user, save_bzu_record, 
+    get_today_records, get_user_record, get_user_limits,
+    get_all_users, update_limits,
+    save_plan_record, get_plan_record, get_plan_history,
+    get_user_history, update_user_name
+)
+
 from database_mysql import (
     init_db, get_or_create_user, save_bzu_record, 
     get_today_records, get_user_record, get_user_limits,
@@ -148,6 +158,27 @@ def get_status(value, min_val, max_val):
 @app.get("/api/users")
 async def get_users():
     return get_all_users()
+
+@app.get("/api/user/{user_id}")
+async def get_user(user_id: int, first_name: str = None):
+    user = get_or_create_user(user_id, first_name=first_name)
+    
+    # Если имя передано и оно отличается от сохранённого — обновляем
+    if first_name and user.get('first_name') != first_name:
+        update_user_name(user_id, first_name)
+        user['first_name'] = first_name
+    
+    limits = get_user_limits(user_id)
+    today_record = get_user_record(user_id)
+    
+    return {
+        "user": user,
+        "limits": limits,
+        "today_record": today_record or {
+            "protein": 0, "fat": 0, "carbs": 0, "fiber": 0, "calories": 0
+        }
+    }
+
 
 @app.post("/api/limits")
 async def update_limits_endpoint(data: LimitsData):
