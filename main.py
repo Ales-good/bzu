@@ -14,7 +14,7 @@ from database_mysql import (
     get_today_records, get_user_record, get_user_limits,
     get_all_users, update_limits,
     save_plan_record, get_plan_record, get_plan_history,
-    get_user_history, update_user_name
+    get_user_history, update_user_name, get_db
 )
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
@@ -45,6 +45,35 @@ app.add_middleware(
 )
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# ============ ОЧИСТКА ТЕСТОВЫХ ПОЛЬЗОВАТЕЛЕЙ ============
+def cleanup_test_users():
+    """Удаляет пользователей с именами 'Гость' и 'Тест' у которых нет активности"""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Удаляем пользователей с именами 'Гость' или 'Тест'
+        # у которых нет записей БЖУ (все показатели = 0)
+        cursor.execute("""
+            DELETE FROM users 
+            WHERE (first_name = 'Гость' OR first_name = 'Тест' OR first_name IS NULL OR first_name = '')
+            AND user_id NOT IN (
+                SELECT DISTINCT user_id FROM bzu_records 
+                WHERE protein > 0 OR fat > 0 OR carbs > 0 OR fiber > 0 OR calories > 0
+            )
+        """)
+        
+        deleted_count = cursor.rowcount
+        conn.commit()
+        conn.close()
+        
+        if deleted_count > 0:
+            print(f"🧹 Удалено {deleted_count} тестовых пользователей")
+        return deleted_count
+    except Exception as e:
+        print(f"❌ Ошибка очистки: {e}")
+        return 0
 
 # ============ МОДЕЛИ ============
 class BZUData(BaseModel):
@@ -83,6 +112,20 @@ async def index():
 
 @app.get("/api/user/{user_id}")
 async def get_user(user_id: int, first_name: str = None):
+    # Если имя не передано или это "Гость"/"Тест" - не создаем нового пользователя
+    if not first_name or first_name in ['Гость', 'Тест', '']:
+        # Проверяем, существует ли пользователь
+        user = get_or_create_user(user_id, first_name='Гость')
+        limits = get_user_limits(user_id)
+        today_record = get_user_record(user_id)
+        return {
+            "user": user,
+            "limits": limits,
+            "today_record": today_record or {
+                "protein": 0, "fat": 0, "carbs": 0, "fiber": 0, "calories": 0
+            }
+        }
+    
     user = get_or_create_user(user_id, first_name=first_name)
     limits = get_user_limits(user_id)
     today_record = get_user_record(user_id)
@@ -98,7 +141,8 @@ async def get_user(user_id: int, first_name: str = None):
 @app.post("/api/save")
 async def save_data(data: BZUData):
     try:
-        if data.user_name:
+        # Если имя "Гость" или "Тест" - не обновляем его
+        if data.user_name and data.user_name not in ['Гость', 'Тест', '']:
             update_user_name(data.user_id, data.user_name)
         
         save_bzu_record(
@@ -177,7 +221,8 @@ async def save_plan(data: PlanData):
     try:
         print(f"📥 Сохраняем план для user_id={data.user_id}")
         
-        if data.user_name:
+        # Если имя "Гость" или "Тест" - не обновляем его
+        if data.user_name and data.user_name not in ['Гость', 'Тест', '']:
             update_user_name(data.user_id, data.user_name)
         
         user = get_or_create_user(data.user_id)
@@ -266,7 +311,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     print(f"📩 /start от {user.first_name} (ID: {user.id}) в чате: {chat.type if chat else 'unknown'}")
     
-    # В ЛИЧНЫХ СООБЩЕНИЯХ - web_app кнопка (открывается внутри Telegram)
+    # В ЛИЧНЫХ СООБЩЕНИЯХ - web_app кнопка
     if chat and chat.type == 'private':
         keyboard = [[
             InlineKeyboardButton(
@@ -394,6 +439,9 @@ async def startup():
         
         await bot_app.bot.set_webhook(WEBHOOK_URL, drop_pending_updates=True)
         print(f"✅ Webhook установлен: {WEBHOOK_URL}")
+        
+        # Очищаем тестовых пользователей при старте
+        cleanup_test_users()
         
         print("✅ Бот успешно запущен!")
     except Exception as e:
