@@ -1237,24 +1237,46 @@
             return data;
         }
 
-        function savePlanData() {
-            const data = getPlanData();
-            localStorage.setItem('plan_data_' + userId, JSON.stringify(data));
+        // ============ СОХРАНЕНИЕ ПЛАНА НА СЕРВЕР ============
+        async function savePlanToServer() {
+            const planData = getPlanData();
             
-            // Сохраняем в историю (ежедневно)
-            savePlanHistory(data);
+            const data = {
+                user_id: userId,
+                plan_data: planData,
+                record_date: new Date().toISOString().split('T')[0]
+            };
+            
+            try {
+                const response = await fetch('/api/plan/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                if (response.ok) {
+                    console.log('✅ План сохранён на сервер');
+                } else {
+                    console.error('❌ Ошибка сохранения плана');
+                }
+            } catch (error) {
+                console.error('❌ Ошибка:', error);
+            }
         }
-
-        function loadPlanData() {
-            const saved = localStorage.getItem('plan_data_' + userId);
-            if (saved) {
-                try {
-                    const data = JSON.parse(saved);
+        
+        // ============ ЗАГРУЗКА ПЛАНА С СЕРВЕРА ============
+        async function loadPlanFromServer() {
+            try {
+                const response = await fetch(`/api/plan/get/${userId}`);
+                const data = await response.json();
+                
+                if (data.plan && Object.keys(data.plan).length > 0) {
+                    const plan = data.plan;
                     
                     document.querySelectorAll('.plan-item').forEach(el => {
                         const id = el.dataset.id;
-                        if (data[id]) {
-                            if (data[id].done) {
+                        if (plan[id]) {
+                            if (plan[id].done) {
                                 el.classList.remove('pending');
                                 el.classList.add('done');
                                 el.querySelector('.status').textContent = '✅';
@@ -1265,16 +1287,73 @@
                             }
                             
                             const input = el.querySelector('.input-count');
-                            if (input && data[id].count) {
-                                input.value = data[id].count;
+                            if (input && plan[id].count) {
+                                input.value = plan[id].count;
                             }
                         }
                     });
                     
                     updatePlanProgress();
-                } catch (e) {
-                    console.error('Ошибка загрузки плана:', e);
+                    console.log('✅ План загружен с сервера');
                 }
+            } catch (error) {
+                console.error('❌ Ошибка загрузки плана:', error);
+            }
+        }
+        
+        // ============ ОБНОВЛЁННАЯ ФУНКЦИЯ СОХРАНЕНИЯ ============
+        function togglePlan(el) {
+            const isDone = el.classList.contains('done');
+            
+            if (isDone) {
+                el.classList.remove('done');
+                el.classList.add('pending');
+                el.querySelector('.status').textContent = '◻️';
+            } else {
+                el.classList.remove('pending');
+                el.classList.add('done');
+                el.querySelector('.status').textContent = '✅';
+            }
+            
+            const input = el.querySelector('.input-count');
+            if (input) {
+                const val = parseInt(input.value);
+                if (val > 0) {
+                    // сохраняем
+                }
+            }
+            
+            updatePlanProgress();
+            savePlanData();
+            
+            // Сохраняем на сервер
+            savePlanToServer();
+        }
+        
+        // ============ ОБНОВЛЁННАЯ ФУНКЦИЯ ЗАГРУЗКИ ============
+        async function loadUserData() {
+            // ... существующий код ...
+            
+            // Загружаем план с сервера
+            await loadPlanFromServer();
+            
+            // Загружаем план из localStorage (как резерв)
+            loadPlanData();
+        }
+        
+        // ============ ПРИ ЗАКРЫТИИ ============
+        function closeApp() {
+            // Сохраняем план
+            savePlanToServer();
+            
+            // Сохраняем БЖУ
+            saveDataBeforeClose();
+            
+            // Закрываем WebApp
+            if (window.Telegram && window.Telegram.WebApp) {
+                window.Telegram.WebApp.close();
+            } else {
+                window.close();
             }
         }
 
