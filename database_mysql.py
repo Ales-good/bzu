@@ -2,18 +2,30 @@ import os
 import pymysql
 from datetime import date
 from typing import List, Dict, Optional
-import re
 import json
 
+DB_NAME = "bzu.db"
+
 def get_db():
-    """Подключаемся к MySQL (прямое подключение)"""
+    """Подключаемся к MySQL"""
     
-    # Данные из твоей консоли Railway
-    host = "mysql.railway.internal"
-    user = "root"
-    password = "ZblKDXodWUWBsbvhprKbKLXEzkEgYOfC"
-    database = "railway"
-    port = 3306
+    # Берем переменные из окружения
+    host = os.getenv("MYSQLHOST")
+    user = os.getenv("MYSQLUSER")
+    password = os.getenv("MYSQLPASSWORD")
+    database = os.getenv("MYSQLDATABASE")
+    port = int(os.getenv("MYSQLPORT", 3306))
+    
+    if not all([host, user, password, database]):
+        # Пробуем через MYSQL_URL
+        mysql_url = os.getenv("MYSQL_URL")
+        if mysql_url:
+            import re
+            pattern = r'mysql://([^:]+):([^@]+)@([^:]+):(\d+)/(.+)'
+            match = re.match(pattern, mysql_url)
+            if match:
+                user, password, host, port, database = match.groups()
+                port = int(port)
     
     print(f"🔌 Подключение к MySQL: {host}:{port}/{database}")
     
@@ -81,8 +93,8 @@ def init_db():
             UNIQUE KEY (user_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ''')
-
-    # ===== НОВАЯ ТАБЛИЦА ДЛЯ ПЛАНА =====
+    
+    # ===== ТАБЛИЦА ДЛЯ ПЛАНА =====
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS plan_records (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -94,6 +106,8 @@ def init_db():
             FOREIGN KEY (user_id) REFERENCES users(user_id),
             UNIQUE KEY (user_id, record_date)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    ''')
+    
     conn.commit()
     
     # Проверяем
@@ -103,6 +117,8 @@ def init_db():
     print(f"✅ Созданы таблицы: {table_names}")
     
     conn.close()
+
+# ============ CRUD ДЛЯ ПОЛЬЗОВАТЕЛЕЙ ============
 
 def get_or_create_user(user_id: int, username: str = None, first_name: str = None, last_name: str = None) -> Dict:
     conn = get_db()
@@ -137,6 +153,8 @@ def get_all_users() -> List[Dict]:
     users = cursor.fetchall()
     conn.close()
     return users
+
+# ============ CRUD ДЛЯ ЗАПИСЕЙ БЖУ ============
 
 def save_bzu_record(user_id: int, protein: float, fat: float, carbs: float, fiber: float, record_date: str = None):
     if not record_date:
@@ -207,6 +225,8 @@ def get_user_record(user_id: int, record_date: str = None) -> Optional[Dict]:
     conn.close()
     return record
 
+# ============ ЛИМИТЫ ============
+
 def get_user_limits(user_id: int) -> Dict:
     conn = get_db()
     cursor = conn.cursor()
@@ -237,6 +257,39 @@ def get_user_limits(user_id: int) -> Dict:
             'fiber_min': 10,
             'fiber_max': 20
         }
+
+def update_limits(user_id: int, 
+                  protein_min: float, protein_max: float,
+                  fat_min: float, fat_max: float,
+                  carbs_min: float, carbs_max: float,
+                  fiber_min: float, fiber_max: float):
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        INSERT INTO limits (
+            user_id, 
+            protein_min, protein_max,
+            fat_min, fat_max,
+            carbs_min, carbs_max,
+            fiber_min, fiber_max
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON DUPLICATE KEY UPDATE
+            protein_min = VALUES(protein_min),
+            protein_max = VALUES(protein_max),
+            fat_min = VALUES(fat_min),
+            fat_max = VALUES(fat_max),
+            carbs_min = VALUES(carbs_min),
+            carbs_max = VALUES(carbs_max),
+            fiber_min = VALUES(fiber_min),
+            fiber_max = VALUES(fiber_max)
+    ''', (user_id, protein_min, protein_max, fat_min, fat_max, carbs_min, carbs_max, fiber_min, fiber_max))
+    
+    conn.commit()
+    conn.close()
+
+# ============ ПЛАН ВЫПОЛНЕНИЯ ============
 
 def save_plan_record(user_id: int, plan_data: dict, record_date: str = None):
     """Сохраняет план выполнения на дату"""
@@ -304,35 +357,3 @@ def get_plan_history(user_id: int, days: int = 30) -> List[Dict]:
         result.append(rec_dict)
     
     return result
-
-
-def update_limits(user_id: int, 
-                  protein_min: float, protein_max: float,
-                  fat_min: float, fat_max: float,
-                  carbs_min: float, carbs_max: float,
-                  fiber_min: float, fiber_max: float):
-    conn = get_db()
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        INSERT INTO limits (
-            user_id, 
-            protein_min, protein_max,
-            fat_min, fat_max,
-            carbs_min, carbs_max,
-            fiber_min, fiber_max
-        )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-        ON DUPLICATE KEY UPDATE
-            protein_min = VALUES(protein_min),
-            protein_max = VALUES(protein_max),
-            fat_min = VALUES(fat_min),
-            fat_max = VALUES(fat_max),
-            carbs_min = VALUES(carbs_min),
-            carbs_max = VALUES(carbs_max),
-            fiber_min = VALUES(fiber_min),
-            fiber_max = VALUES(fiber_max)
-    ''', (user_id, protein_min, protein_max, fat_min, fat_max, carbs_min, carbs_max, fiber_min, fiber_max))
-    
-    conn.commit()
-    conn.close()
