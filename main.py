@@ -18,7 +18,7 @@ from database_mysql import (
 )
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
-from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler, MessageHandler, filters
+from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
 # Настройка логов
 logging.basicConfig(
@@ -233,7 +233,7 @@ async def get_history(user_id: int, days: int = 90):
         completed_items = 0
         for v in plan_data.values():
             if isinstance(v, dict):
-                if v.get('done', False) or v.get('count', 0) > 0:  # <-- ИСПРАВЛЕНО!
+                if v.get('done', False) or v.get('count', 0) > 0:
                     completed_items += 1
             elif v:
                 completed_items += 1 if v else 0
@@ -266,39 +266,32 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     print(f"📩 /start от {user.first_name} (ID: {user.id}) в чате: {chat.type if chat else 'unknown'}")
     
-    # ТОЛЬКО ОДНА КНОПКА С WEB_APP
-    keyboard = [[
-        InlineKeyboardButton(
-            "main",
-            web_app=WebAppInfo(url=WEBAPP_URL)
-        )
-    ]]
-    
-    # ВТОРАЯ КНОПКА - ОБЫЧНАЯ
-    keyboard.append([
-        InlineKeyboardButton(
-            "📈 Статистика",
-            callback_data="stats"
-        )
-    ])
-    
+    # БЕЗ КНОПОК - используем Menu Button из BotFather
     if chat and chat.type in ['group', 'supergroup']:
         text = (
-            "👋 Привет! Я бот для учета БЖУ в этой группе.\n\n"
-            "📝 Нажми на кнопку ниже, чтобы открыть дневник.\n"
-            "Там ты сможешь вводить свои показатели и отмечать план."
+            "👋 Привет! Я бот для учета БЖУ.\n\n"
+            "📝 Нажми на кнопку <b>Menu</b> внизу экрана, чтобы открыть дневник.\n\n"
+            "Там ты сможешь:\n"
+            "✅ Вводить свои показатели (БЖУ + калории)\n"
+            "📈 Смотреть графики динамики\n"
+            "🏆 Отмечать план выполнения\n\n"
+            "💡 Команды:\n"
+            "/start - Главное меню\n"
+            "/stats - Статистика за сегодня\n"
+            "/help - Помощь"
         )
     else:
         text = (
             "👋 Привет! Я бот для учета БЖУ.\n\n"
-            "📝 Нажми на кнопку ниже, чтобы открыть дневник.\n"
-            "Добавь меня в группу, чтобы сравнивать результаты!"
+            "📝 Нажми на кнопку <b>Menu</b> внизу экрана, чтобы открыть дневник.\n\n"
+            "Добавь меня в группу, чтобы сравнивать результаты!\n\n"
+            "💡 Команды:\n"
+            "/start - Главное меню\n"
+            "/stats - Статистика за сегодня\n"
+            "/help - Помощь"
         )
     
-    await update.message.reply_text(
-        text,
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    await update.message.reply_text(text, parse_mode='HTML')
 
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Показывает статистику за сегодня"""
@@ -333,40 +326,10 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🤖 <b>Команды бота:</b>\n\n"
         "/start - Главное меню\n"
         "/stats - Статистика за сегодня\n"
-        "/help - Помощь",
+        "/help - Помощь\n\n"
+        "📝 Нажми на кнопку <b>Menu</b> внизу экрана, чтобы открыть дневник.",
         parse_mode='HTML'
     )
-
-async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка callback-запросов от кнопок"""
-    query = update.callback_query
-    await query.answer()
-    
-    if query.data == "stats":
-        records = get_today_records()
-        active_records = [r for r in records if r['protein'] + r['fat'] + r['carbs'] + r['fiber'] + r['calories'] > 0]
-        
-        if not active_records:
-            await query.message.reply_text("📭 Сегодня никто не ввел данные!")
-            return
-        
-        message = "📊 <b>Сводка за сегодня</b>\n\n"
-        for rec in active_records:
-            name = rec['first_name'] or rec['username'] or f"User {rec['user_id']}"
-            message += f"👤 <b>{name}</b>\n"
-            if rec['protein'] > 0:
-                message += f"  🍗 Белки: {rec['protein']:.0f}г\n"
-            if rec['fat'] > 0:
-                message += f"  🧈 Жиры: {rec['fat']:.0f}г\n"
-            if rec['carbs'] > 0:
-                message += f"  🍞 Углеводы: {rec['carbs']:.0f}г\n"
-            if rec['fiber'] > 0:
-                message += f"  🥦 Клетчатка: {rec['fiber']:.0f}г\n"
-            if rec['calories'] > 0:
-                message += f"  🔥 Калории: {rec['calories']:.0f}ккал\n"
-            message += "\n"
-        
-        await query.message.reply_text(message, parse_mode='HTML')
 
 async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка сообщений в группах"""
@@ -403,7 +366,6 @@ async def startup():
         bot_app.add_handler(CommandHandler("start", start))
         bot_app.add_handler(CommandHandler("help", help_command))
         bot_app.add_handler(CommandHandler("stats", stats_command))
-        bot_app.add_handler(CallbackQueryHandler(handle_callback))
         bot_app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.GROUPS, handle_group_message))
         
         await bot_app.initialize()
