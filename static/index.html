@@ -1937,6 +1937,156 @@
                 updatePlanStats(currentPeriod);
             }
         }, 30000);
+
+            <!-- ===== КНОПКА ЗАКРЫТИЯ (исправленная) ===== -->
+    <button class="tg-button" onclick="closeApp()">✖️ Закрыть</button>
+
+    <script>
+        // ============ ИСПРАВЛЕННОЕ ЗАКРЫТИЕ ============
+        function closeApp() {
+            // Сначала сохраняем данные
+            saveDataBeforeClose();
+            
+            // Закрываем WebApp
+            if (window.Telegram && window.Telegram.WebApp) {
+                window.Telegram.WebApp.close();
+            } else {
+                // Если не в Telegram — просто закрываем окно
+                window.close();
+            }
+        }
+
+        function saveDataBeforeClose() {
+            // Собираем все данные
+            const data = {
+                user_id: userId,
+                protein: parseFloat(document.getElementById('protein').value) || 0,
+                fat: parseFloat(document.getElementById('fat').value) || 0,
+                carbs: parseFloat(document.getElementById('carbs').value) || 0,
+                fiber: parseFloat(document.getElementById('fiber').value) || 0
+            };
+            
+            // Сохраняем в localStorage (на случай, если сервер недоступен)
+            localStorage.setItem('bzu_data_' + userId, JSON.stringify(data));
+            
+            // Отправляем на сервер
+            fetch('/api/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                console.log('✅ Данные сохранены перед закрытием:', result);
+            })
+            .catch(error => {
+                console.error('❌ Ошибка сохранения:', error);
+                // Данные уже в localStorage, не теряются
+            });
+        }
+
+        // ============ АВТОСОХРАНЕНИЕ ПРИ ВВОДЕ ============
+        document.querySelectorAll('#tabMy .input-group input').forEach(input => {
+            input.addEventListener('change', function() {
+                const data = {
+                    user_id: userId,
+                    protein: parseFloat(document.getElementById('protein').value) || 0,
+                    fat: parseFloat(document.getElementById('fat').value) || 0,
+                    carbs: parseFloat(document.getElementById('carbs').value) || 0,
+                    fiber: parseFloat(document.getElementById('fiber').value) || 0
+                };
+                
+                // Сохраняем в localStorage при каждом изменении
+                localStorage.setItem('bzu_data_' + userId, JSON.stringify(data));
+            });
+        });
+
+        // ============ ЗАГРУЗКА ДАННЫХ ПРИ ОТКРЫТИИ ============
+        function loadSavedData() {
+            const saved = localStorage.getItem('bzu_data_' + userId);
+            if (saved) {
+                try {
+                    const data = JSON.parse(saved);
+                    
+                    document.getElementById('protein').value = data.protein || 0;
+                    document.getElementById('fat').value = data.fat || 0;
+                    document.getElementById('carbs').value = data.carbs || 0;
+                    document.getElementById('fiber').value = data.fiber || 0;
+                    
+                    // Обновляем статистику
+                    userData = data;
+                    updateStats();
+                    updateProgressBars();
+                    
+                    console.log('✅ Данные загружены из localStorage:', data);
+                } catch (e) {
+                    console.error('❌ Ошибка загрузки:', e);
+                }
+            }
+        }
+
+        // ============ ПЕРЕХВАТ ЗАКРЫТИЯ (на случай, если закрывают через свайп) ============
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'hidden') {
+                saveDataBeforeClose();
+            }
+        });
+
+        // ============ ПРИ ЗАГРУЗКЕ ============
+        // После загрузки пользователя загружаем сохранённые данные
+        // Вызови эту функцию после loadUserData()
+        // loadSavedData();
+
+        // ============ ОБНОВЛЁННАЯ ЗАГРУЗКА ПОЛЬЗОВАТЕЛЯ ============
+        // Замени существующую loadUserData на эту
+        async function loadUserData() {
+            if (!userId) {
+                userId = Date.now();
+                document.getElementById('userName').textContent = 'Тест';
+                document.getElementById('userAvatar').textContent = 'Т';
+            }
+            
+            try {
+                const data = await apiCall(`/api/user/${userId}`);
+                limits = data.limits;
+                const record = data.today_record || {};
+                userData = {
+                    protein: record.protein || 0,
+                    fat: record.fat || 0,
+                    carbs: record.carbs || 0,
+                    fiber: record.fiber || 0
+                };
+                
+                const fields = ['protein', 'fat', 'carbs', 'fiber'];
+                fields.forEach(f => {
+                    document.getElementById(`limit${f.charAt(0).toUpperCase() + f.slice(1)}Min`).textContent = limits[`${f}_min`];
+                    document.getElementById(`limit${f.charAt(0).toUpperCase() + f.slice(1)}Max`).textContent = limits[`${f}_max`];
+                    document.getElementById(`${f}MinLabel`).textContent = limits[`${f}_min`];
+                    document.getElementById(`${f}MaxLabel`).textContent = limits[`${f}_max`];
+                    document.getElementById(f).value = userData[f];
+                });
+                
+                updateStats();
+                updateProgressBars();
+                
+                // Загружаем план
+                loadPlanData();
+                loadPlanHistory();
+                updatePlanStats('day');
+                
+                // Загружаем сохранённые данные из localStorage (если есть)
+                loadSavedData();
+                
+                // Если не в Telegram — подставляем тестовое имя
+                if (!tg) {
+                    document.getElementById('userName').textContent = 'Тест';
+                    document.getElementById('userAvatar').textContent = 'Т';
+                }
+                
+            } catch (error) {
+                showToast('Ошибка загрузки', 'error');
+            }
+        }
     </script>
 </body>
 </html>
