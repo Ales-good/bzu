@@ -45,7 +45,7 @@ def init_db():
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ''')
     
-    # Таблица записей БЖУ (добавлено поле calories)
+    # Таблица записей БЖУ
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS bzu_records (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -58,7 +58,7 @@ def init_db():
             calories DECIMAL(10,2) DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(user_id),
+            FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
             UNIQUE KEY (user_id, record_date)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ''')
@@ -67,7 +67,7 @@ def init_db():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS limits (
             id INT AUTO_INCREMENT PRIMARY KEY,
-            user_id BIGINT,
+            user_id BIGINT UNIQUE,
             protein_min DECIMAL(10,2) DEFAULT 150,
             protein_max DECIMAL(10,2) DEFAULT 200,
             fat_min DECIMAL(10,2) DEFAULT 70,
@@ -78,8 +78,7 @@ def init_db():
             fiber_max DECIMAL(10,2) DEFAULT 20,
             calories_min DECIMAL(10,2) DEFAULT 2000,
             calories_max DECIMAL(10,2) DEFAULT 2500,
-            FOREIGN KEY (user_id) REFERENCES users(user_id),
-            UNIQUE KEY (user_id)
+            FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ''')
     
@@ -92,7 +91,7 @@ def init_db():
             plan_data JSON,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(user_id),
+            FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
             UNIQUE KEY (user_id, record_date)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ''')
@@ -127,19 +126,18 @@ def get_or_create_user(user_id: int, username: str = None, first_name: str = Non
     conn = get_db()
     cursor = conn.cursor()
     
+    # Проверяем, есть ли пользователь
     cursor.execute("SELECT * FROM users WHERE user_id = %s", (user_id,))
     user = cursor.fetchone()
     
     if not user:
-        # Если нет имени - используем "Гость" или username
-        if not first_name:
-            first_name = username or f"User {user_id}"
-        
+        # Создаем пользователя
         cursor.execute('''
             INSERT INTO users (user_id, username, first_name, last_name)
             VALUES (%s, %s, %s, %s)
         ''', (user_id, username, first_name, last_name))
         
+        # Создаем лимиты
         cursor.execute('''
             INSERT INTO limits (user_id, protein_min, protein_max, fat_min, fat_max, carbs_min, carbs_max, fiber_min, fiber_max, calories_min, calories_max)
             VALUES (%s, 150, 200, 70, 80, 80, 100, 10, 20, 2000, 2500)
@@ -151,9 +149,21 @@ def get_or_create_user(user_id: int, username: str = None, first_name: str = Non
         print(f"✅ Создан новый пользователь: {user_id} - {first_name}")
     else:
         # Если пользователь существует, но имя не совпадает - обновляем
-        if first_name and user.get('first_name') != first_name and first_name != 'Гость':
+        if first_name and user.get('first_name') != first_name and first_name not in ['Гость', 'Тест']:
             update_user_name(user_id, first_name)
             user['first_name'] = first_name
+        
+        # Проверяем, есть ли лимиты у пользователя
+        cursor.execute("SELECT * FROM limits WHERE user_id = %s", (user_id,))
+        limits = cursor.fetchone()
+        if not limits:
+            # Если лимитов нет - создаем
+            cursor.execute('''
+                INSERT INTO limits (user_id, protein_min, protein_max, fat_min, fat_max, carbs_min, carbs_max, fiber_min, fiber_max, calories_min, calories_max)
+                VALUES (%s, 150, 200, 70, 80, 80, 100, 10, 20, 2000, 2500)
+            ''', (user_id,))
+            conn.commit()
+            print(f"✅ Созданы лимиты для пользователя: {user_id}")
     
     conn.close()
     return user
@@ -258,7 +268,6 @@ def get_user_history(user_id: int, days: int = 90) -> List[Dict]:
     records = cursor.fetchall()
     conn.close()
     
-    # Преобразуем Decimal в float для JSON
     result = []
     for rec in records:
         result.append({
