@@ -9,6 +9,7 @@ import json
 import threading
 from datetime import date
 import os
+from pydantic import BaseModel
 
 from database_mysql import (
     init_db, get_or_create_user, save_bzu_record, 
@@ -149,6 +150,36 @@ async def update_limits_endpoint(data: LimitsData):
         return {"status": "success", "message": "Лимиты обновлены"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+# ============ МОДЕЛЬ ДЛЯ ПЛАНА ============
+class PlanData(BaseModel):
+    user_id: int
+    plan_data: dict
+    record_date: Optional[str] = None
+
+# ============ API ДЛЯ ПЛАНА ============
+@app.post("/api/plan/save")
+async def save_plan(data: PlanData):
+    """Сохраняет план выполнения"""
+    try:
+        save_plan_record(data.user_id, data.plan_data, data.record_date)
+        return {"status": "success", "message": "План сохранен"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/plan/get/{user_id}")
+async def get_plan(user_id: int, date: Optional[str] = None):
+    """Получает план на дату"""
+    plan = get_plan_record(user_id, date)
+    return {"plan": plan or {}}
+
+@app.get("/api/plan/history/{user_id}")
+async def get_plan_history(user_id: int, days: int = 30):
+    """Получает историю плана"""
+    history = get_plan_history(user_id, days)
+    return {"history": history}
+
+
 
 # ============ ТЕЛЕГРАМ БОТ ============
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
