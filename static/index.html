@@ -1032,23 +1032,49 @@
                 const users = await apiCall('/api/users');
                 if (!users) return;
                 
-                // Собираем данные по каждому пользователю
+                // ФИЛЬТРУЕМ - только пользователи с активностью
+                const activeUsers = [];
+                for (const user of users) {
+                    // Проверяем, есть ли у пользователя данные за последние дни
+                    const history = await apiCall(`/api/history/${user.user_id}?days=${days}`);
+                    if (history && history.dates && history.dates.length > 0) {
+                        // Проверяем, есть ли хоть какие-то данные (не все нули)
+                        const hasData = history.calories.some(c => c > 0) || 
+                                       history.protein?.some(p => p > 0) ||
+                                       history.plan_data?.some(p => Object.keys(p).length > 0);
+                        if (hasData) {
+                            activeUsers.push(user);
+                        }
+                    }
+                }
+                
+                // Собираем данные по активным пользователям
                 allUsersData = {};
                 const userSelector = document.getElementById('userSelector');
                 userSelector.innerHTML = '';
                 
-                // Добавляем чекбоксы для выбора пользователей
-                users.forEach(user => {
+                // Если нет активных пользователей - показываем сообщение
+                if (activeUsers.length === 0) {
+                    userSelector.innerHTML = '<span style="color: var(--text-secondary); font-size: 14px;">📭 Нет активных пользователей</span>';
+                    // Показываем пустые графики
+                    renderEmptyCharts();
+                    return;
+                }
+                
+                // Добавляем чипы только для активных пользователей
+                activeUsers.forEach(user => {
                     const chip = document.createElement('span');
                     chip.className = 'user-chip';
                     chip.dataset.userId = user.user_id;
                     chip.textContent = user.first_name || `User ${user.user_id}`;
                     
-                    // По умолчанию выбираем текущего пользователя и всех, у кого есть данные
+                    // По умолчанию выбираем текущего пользователя
                     const isCurrent = user.user_id === userId;
-                    if (isCurrent) {
+                    if (isCurrent || selectedUsers.length === 0) {
                         chip.classList.add('active');
-                        selectedUsers.push(user.user_id);
+                        if (!selectedUsers.includes(user.user_id)) {
+                            selectedUsers.push(user.user_id);
+                        }
                     }
                     
                     chip.onclick = function() {
@@ -1060,57 +1086,73 @@
                         } else {
                             selectedUsers.push(id);
                         }
-                        loadAllCharts(days);
+                        if (selectedUsers.length === 0) {
+                            // Если никого не выбрано - показываем пустые графики
+                            renderEmptyCharts();
+                        } else {
+                            loadAllCharts(days);
+                        }
                     };
                     
                     userSelector.appendChild(chip);
                 });
                 
-                // Если никого не выбрано - выбираем текущего
-                if (selectedUsers.length === 0 && userId) {
-                    selectedUsers = [userId];
-                    document.querySelectorAll('.user-chip').forEach(el => {
-                        if (parseInt(el.dataset.userId) === userId) {
-                            el.classList.add('active');
-                        }
-                    });
-                }
-                
                 // Загружаем данные для выбранных пользователей
-                await loadAllCharts(days);
+                if (selectedUsers.length > 0) {
+                    await loadAllCharts(days);
+                } else {
+                    renderEmptyCharts();
+                }
                 
             } catch (error) {
                 console.error('❌ Ошибка загрузки аналитики:', error);
             }
         }
-
-        async function loadAllCharts(days) {
-            if (selectedUsers.length === 0) return;
-            
-            // Загружаем данные для всех выбранных пользователей
-            const allData = {};
-            for (const uid of selectedUsers) {
-                const history = await apiCall(`/api/history/${uid}?days=${days}`);
-                if (history) {
-                    allData[uid] = history;
+        
+        function renderEmptyCharts() {
+            // Показываем пустые графики с сообщением
+            const charts = ['caloriesChart', 'bzuChart', 'exercisesChart', 'conditionsChart'];
+            charts.forEach(id => {
+                const ctx = document.getElementById(id).getContext('2d');
+                if (window[id.replace('Chart', '') + 'Chart']) {
+                    window[id.replace('Chart', '') + 'Chart'].destroy();
                 }
-            }
-            
-            // Получаем имена пользователей
-            const users = await apiCall('/api/users');
-            const userNames = {};
-            if (users) {
-                users.forEach(u => {
-                    userNames[u.user_id] = u.first_name || `User ${u.user_id}`;
+                // Создаем пустой график
+                const chart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Нет данных'],
+                        datasets: [{
+                            label: 'Нет данных',
+                            data: [0],
+                            backgroundColor: 'rgba(255,255,255,0.05)',
+                            borderColor: 'rgba(255,255,255,0.1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: { color: 'rgba(255,255,255,0.05)' },
+                                ticks: { color: 'rgba(255,255,255,0.4)' }
+                            },
+                            x: {
+                                grid: { display: false },
+                                ticks: { color: 'rgba(255,255,255,0.4)' }
+                            }
+                        }
+                    }
                 });
-            }
-            
-            renderCaloriesChart(allData, userNames);
-            renderBZUChart(allData, userNames);
-            renderExercisesChart(allData, userNames);
-            renderConditionsChart(allData, userNames);
+                window[id.replace('Chart', '') + 'Chart'] = chart;
+            });
         }
-
+        
         function renderCaloriesChart(allData, userNames) {
             const ctx = document.getElementById('caloriesChart').getContext('2d');
             if (caloriesChart) caloriesChart.destroy();
@@ -1135,8 +1177,9 @@
                         backgroundColor: colors[index % colors.length] + '20',
                         fill: true,
                         tension: 0.4,
-                        pointRadius: 3,
-                        pointHoverRadius: 6
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        pointBackgroundColor: colors[index % colors.length]
                     });
                 }
             });
@@ -1167,14 +1210,15 @@
                             display: true,
                             position: 'top',
                             labels: {
-                                color: 'rgba(255,255,255,0.6)',
-                                font: { size: 10 }
+                                color: 'rgba(255,255,255,0.8)',
+                                font: { size: 11, weight: 'bold' },
+                                padding: 15
                             }
                         },
                         tooltip: {
                             callbacks: {
                                 label: function(ctx) {
-                                    return ctx.dataset.label + ': ' + ctx.parsed.y + ' ккал';
+                                    return ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(0) + ' ккал';
                                 }
                             }
                         }
@@ -1183,22 +1227,31 @@
                         y: {
                             beginAtZero: true,
                             grid: { color: 'rgba(255,255,255,0.05)' },
-                            ticks: { color: 'rgba(255,255,255,0.4)' }
+                            ticks: { 
+                                color: 'rgba(255,255,255,0.6)',
+                                font: { size: 10 },
+                                callback: function(value) {
+                                    return value + ' ккал';
+                                }
+                            }
                         },
                         x: {
                             grid: { display: false },
-                            ticks: { color: 'rgba(255,255,255,0.4)', maxTicksLimit: 20 }
+                            ticks: { 
+                                color: 'rgba(255,255,255,0.6)',
+                                font: { size: 10 }
+                            }
                         }
                     }
                 }
             });
         }
-
+        
         function renderBZUChart(allData, userNames) {
             const ctx = document.getElementById('bzuChart').getContext('2d');
             if (bzuChart) bzuChart.destroy();
             
-            // Берем данные последнего дня для каждого пользователя
+            // Берем данные за последний день для каждого пользователя
             const labels = [];
             const proteinData = [];
             const fatData = [];
@@ -1209,19 +1262,18 @@
                 const data = allData[uid];
                 if (data && data.dates && data.dates.length > 0) {
                     const lastIndex = data.dates.length - 1;
-                    const record = {
-                        protein: data.protein ? data.protein[lastIndex] : 0,
-                        fat: data.fat ? data.fat[lastIndex] : 0,
-                        carbs: data.carbs ? data.carbs[lastIndex] : 0,
-                        fiber: data.fiber ? data.fiber[lastIndex] : 0
-                    };
-                    // Если есть хоть какие-то данные
-                    if (record.protein > 0 || record.fat > 0 || record.carbs > 0 || record.fiber > 0) {
+                    const protein = data.protein ? data.protein[lastIndex] || 0 : 0;
+                    const fat = data.fat ? data.fat[lastIndex] || 0 : 0;
+                    const carbs = data.carbs ? data.carbs[lastIndex] || 0 : 0;
+                    const fiber = data.fiber ? data.fiber[lastIndex] || 0 : 0;
+                    
+                    // Показываем только если есть хоть какие-то данные
+                    if (protein > 0 || fat > 0 || carbs > 0 || fiber > 0) {
                         labels.push(userNames[uid] || `User ${uid}`);
-                        proteinData.push(record.protein || 0);
-                        fatData.push(record.fat || 0);
-                        carbsData.push(record.carbs || 0);
-                        fiberData.push(record.fiber || 0);
+                        proteinData.push(protein);
+                        fatData.push(fat);
+                        carbsData.push(carbs);
+                        fiberData.push(fiber);
                     }
                 }
             });
@@ -1240,35 +1292,35 @@
                     labels: labels,
                     datasets: [
                         {
-                            label: '🍗 Белки',
+                            label: '🍗 Белки (г)',
                             data: proteinData,
-                            backgroundColor: '#FF6B6B80',
+                            backgroundColor: '#FF6B6B',
                             borderColor: '#FF6B6B',
-                            borderWidth: 1,
+                            borderWidth: 2,
                             borderRadius: 4
                         },
                         {
-                            label: '🧈 Жиры',
+                            label: '🧈 Жиры (г)',
                             data: fatData,
-                            backgroundColor: '#FFD93D80',
+                            backgroundColor: '#FFD93D',
                             borderColor: '#FFD93D',
-                            borderWidth: 1,
+                            borderWidth: 2,
                             borderRadius: 4
                         },
                         {
-                            label: '🍞 Углеводы',
+                            label: '🍞 Углеводы (г)',
                             data: carbsData,
-                            backgroundColor: '#6BCB7780',
+                            backgroundColor: '#6BCB77',
                             borderColor: '#6BCB77',
-                            borderWidth: 1,
+                            borderWidth: 2,
                             borderRadius: 4
                         },
                         {
-                            label: '🥦 Клетчатка',
+                            label: '🥦 Клетчатка (г)',
                             data: fiberData,
-                            backgroundColor: '#4D96FF80',
+                            backgroundColor: '#4D96FF',
                             borderColor: '#4D96FF',
-                            borderWidth: 1,
+                            borderWidth: 2,
                             borderRadius: 4
                         }
                     ]
@@ -1281,8 +1333,16 @@
                             display: true,
                             position: 'top',
                             labels: {
-                                color: 'rgba(255,255,255,0.6)',
-                                font: { size: 10 }
+                                color: 'rgba(255,255,255,0.8)',
+                                font: { size: 11, weight: 'bold' },
+                                padding: 15
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(ctx) {
+                                    return ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(0);
+                                }
                             }
                         }
                     },
@@ -1290,17 +1350,23 @@
                         y: {
                             beginAtZero: true,
                             grid: { color: 'rgba(255,255,255,0.05)' },
-                            ticks: { color: 'rgba(255,255,255,0.4)' }
+                            ticks: { 
+                                color: 'rgba(255,255,255,0.6)',
+                                font: { size: 10 }
+                            }
                         },
                         x: {
                             grid: { display: false },
-                            ticks: { color: 'rgba(255,255,255,0.4)' }
+                            ticks: { 
+                                color: 'rgba(255,255,255,0.6)',
+                                font: { size: 10 }
+                            }
                         }
                     }
                 }
             });
         }
-
+        
         function renderExercisesChart(allData, userNames) {
             const ctx = document.getElementById('exercisesChart').getContext('2d');
             if (exercisesChart) exercisesChart.destroy();
@@ -1310,9 +1376,10 @@
             const squatsData = [];
             const absData = [];
             
+            // Получаем plan_data из истории
             Object.keys(allData).forEach(uid => {
                 const data = allData[uid];
-                if (data && data.plan_data) {
+                if (data && data.plan_data && data.plan_data.length > 0) {
                     // Ищем последнюю запись с упражнениями
                     let lastData = null;
                     for (let i = data.plan_data.length - 1; i >= 0; i--) {
@@ -1323,10 +1390,16 @@
                         }
                     }
                     if (lastData) {
-                        labels.push(userNames[uid] || `User ${uid}`);
-                        pushupsData.push(lastData.pushups?.count || 0);
-                        squatsData.push(lastData.squats?.count || 0);
-                        absData.push(lastData.abs?.count || 0);
+                        const pushups = lastData.pushups?.count || 0;
+                        const squats = lastData.squats?.count || 0;
+                        const abs = lastData.abs?.count || 0;
+                        
+                        if (pushups > 0 || squats > 0 || abs > 0) {
+                            labels.push(userNames[uid] || `User ${uid}`);
+                            pushupsData.push(pushups);
+                            squatsData.push(squats);
+                            absData.push(abs);
+                        }
                     }
                 }
             });
@@ -1344,27 +1417,27 @@
                     labels: labels,
                     datasets: [
                         {
-                            label: '💪 Отжимания',
+                            label: '💪 Отжимания (шт)',
                             data: pushupsData,
-                            backgroundColor: '#FF6B6B80',
+                            backgroundColor: '#FF6B6B',
                             borderColor: '#FF6B6B',
-                            borderWidth: 1,
+                            borderWidth: 2,
                             borderRadius: 4
                         },
                         {
-                            label: '🦵 Приседания',
+                            label: '🦵 Приседания (шт)',
                             data: squatsData,
-                            backgroundColor: '#4D96FF80',
+                            backgroundColor: '#4D96FF',
                             borderColor: '#4D96FF',
-                            borderWidth: 1,
+                            borderWidth: 2,
                             borderRadius: 4
                         },
                         {
-                            label: '🔥 Пресс',
+                            label: '🔥 Пресс (шт)',
                             data: absData,
-                            backgroundColor: '#FFD93D80',
+                            backgroundColor: '#FFD93D',
                             borderColor: '#FFD93D',
-                            borderWidth: 1,
+                            borderWidth: 2,
                             borderRadius: 4
                         }
                     ]
@@ -1377,8 +1450,16 @@
                             display: true,
                             position: 'top',
                             labels: {
-                                color: 'rgba(255,255,255,0.6)',
-                                font: { size: 10 }
+                                color: 'rgba(255,255,255,0.8)',
+                                font: { size: 11, weight: 'bold' },
+                                padding: 15
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(ctx) {
+                                    return ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(0);
+                                }
                             }
                         }
                     },
@@ -1386,17 +1467,23 @@
                         y: {
                             beginAtZero: true,
                             grid: { color: 'rgba(255,255,255,0.05)' },
-                            ticks: { color: 'rgba(255,255,255,0.4)' }
+                            ticks: { 
+                                color: 'rgba(255,255,255,0.6)',
+                                font: { size: 10 }
+                            }
                         },
                         x: {
                             grid: { display: false },
-                            ticks: { color: 'rgba(255,255,255,0.4)' }
+                            ticks: { 
+                                color: 'rgba(255,255,255,0.6)',
+                                font: { size: 10 }
+                            }
                         }
                     }
                 }
             });
         }
-
+        
         function renderConditionsChart(allData, userNames) {
             const ctx = document.getElementById('conditionsChart').getContext('2d');
             if (conditionsChart) conditionsChart.destroy();
@@ -1410,7 +1497,7 @@
             
             Object.keys(allData).forEach(uid => {
                 const data = allData[uid];
-                if (data && data.plan_data) {
+                if (data && data.plan_data && data.plan_data.length > 0) {
                     // Ищем последнюю запись с условиями
                     let lastData = null;
                     for (let i = data.plan_data.length - 1; i >= 0; i--) {
@@ -1421,12 +1508,21 @@
                         }
                     }
                     if (lastData) {
-                        labels.push(userNames[uid] || `User ${uid}`);
-                        massageData.push(lastData.massage?.done ? 1 : 0);
-                        banyaData.push(lastData.banya?.done ? 1 : 0);
-                        poolData.push(lastData.pool?.done ? 1 : 0);
-                        noFoodData.push(lastData.no_food?.done ? 1 : 0);
-                        gymData.push(lastData.gym?.done ? 1 : 0);
+                        const massage = lastData.massage?.done ? 1 : 0;
+                        const banya = lastData.banya?.done ? 1 : 0;
+                        const pool = lastData.pool?.done ? 1 : 0;
+                        const noFood = lastData.no_food?.done ? 1 : 0;
+                        const gym = lastData.gym?.done ? 1 : 0;
+                        
+                        // Показываем только если есть хоть одна галочка
+                        if (massage + banya + pool + noFood + gym > 0) {
+                            labels.push(userNames[uid] || `User ${uid}`);
+                            massageData.push(massage);
+                            banyaData.push(banya);
+                            poolData.push(pool);
+                            noFoodData.push(noFood);
+                            gymData.push(gym);
+                        }
                     }
                 }
             });
@@ -1448,41 +1544,41 @@
                         {
                             label: '💆 Массаж',
                             data: massageData,
-                            backgroundColor: '#FF6B6B80',
+                            backgroundColor: '#FF6B6B',
                             borderColor: '#FF6B6B',
-                            borderWidth: 1,
+                            borderWidth: 2,
                             borderRadius: 4
                         },
                         {
                             label: '🧖 Баня',
                             data: banyaData,
-                            backgroundColor: '#FFD93D80',
+                            backgroundColor: '#FFD93D',
                             borderColor: '#FFD93D',
-                            borderWidth: 1,
+                            borderWidth: 2,
                             borderRadius: 4
                         },
                         {
                             label: '🏊 Бассейн',
                             data: poolData,
-                            backgroundColor: '#4D96FF80',
+                            backgroundColor: '#4D96FF',
                             borderColor: '#4D96FF',
-                            borderWidth: 1,
+                            borderWidth: 2,
                             borderRadius: 4
                         },
                         {
                             label: '⏰ Не ел после 18',
                             data: noFoodData,
-                            backgroundColor: '#6BCB7780',
+                            backgroundColor: '#6BCB77',
                             borderColor: '#6BCB77',
-                            borderWidth: 1,
+                            borderWidth: 2,
                             borderRadius: 4
                         },
                         {
                             label: '🏋️ Зал',
                             data: gymData,
-                            backgroundColor: '#A29BFE80',
+                            backgroundColor: '#A29BFE',
                             borderColor: '#A29BFE',
-                            borderWidth: 1,
+                            borderWidth: 2,
                             borderRadius: 4
                         }
                     ]
@@ -1495,8 +1591,17 @@
                             display: true,
                             position: 'top',
                             labels: {
-                                color: 'rgba(255,255,255,0.6)',
-                                font: { size: 10 }
+                                color: 'rgba(255,255,255,0.8)',
+                                font: { size: 11, weight: 'bold' },
+                                padding: 15
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(ctx) {
+                                    const value = ctx.parsed.y;
+                                    return ctx.dataset.label + ': ' + (value === 1 ? '✅ Выполнено' : '❌ Не выполнено');
+                                }
                             }
                         }
                     },
@@ -1506,7 +1611,8 @@
                             max: 1,
                             grid: { color: 'rgba(255,255,255,0.05)' },
                             ticks: { 
-                                color: 'rgba(255,255,255,0.4)',
+                                color: 'rgba(255,255,255,0.6)',
+                                font: { size: 10 },
                                 stepSize: 1,
                                 callback: function(value) {
                                     return value === 1 ? '✅' : '❌';
@@ -1515,19 +1621,14 @@
                         },
                         x: {
                             grid: { display: false },
-                            ticks: { color: 'rgba(255,255,255,0.4)' }
+                            ticks: { 
+                                color: 'rgba(255,255,255,0.6)',
+                                font: { size: 10 }
+                            }
                         }
                     }
                 }
             });
-        }
-
-        function setPeriod(days) {
-            currentDays = days;
-            document.querySelectorAll('.period-btn').forEach(btn => {
-                btn.classList.toggle('active', parseInt(btn.dataset.period) === days);
-            });
-            loadAnalytics(days);
         }
 
         // ============ ЗАКРЫТИЕ ============
