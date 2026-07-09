@@ -847,53 +847,67 @@
 
     <script>
         // ============ TELEGRAM ============
+        console.log('🔍 Проверка Telegram WebApp...');
+        console.log('window.Telegram:', window.Telegram);
+        console.log('window.Telegram.WebApp:', window.Telegram?.WebApp);
+        
         const tg = window.Telegram?.WebApp;
         let userId = null;
         let userName = 'Гость';
-        let isTelegramUser = false;
-
-        // ПЫТАЕМСЯ ПОЛУЧИТЬ ПОЛЬЗОВАТЕЛЯ ИЗ TELEGRAM
+        
         if (tg) {
             try {
+                console.log('✅ Telegram WebApp найден, инициализация...');
                 tg.expand();
                 tg.ready();
+                
+                // Получаем данные пользователя
                 const user = tg.initDataUnsafe?.user;
+                console.log('📦 Данные из Telegram:', user);
+                
                 if (user && user.id) {
                     userId = user.id;
-                    userName = user.first_name || 'Гость';
-                    isTelegramUser = true;
-                    console.log('✅ Telegram пользователь:', userId, userName);
+                    userName = user.first_name || 'Пользователь';
+                    console.log('✅ Пользователь получен:', { userId, userName });
+                    
+                    // Сохраняем в localStorage
                     localStorage.setItem('bzu_user_id', userId);
                     localStorage.setItem('bzu_user_name', userName);
+                } else {
+                    console.warn('⚠️ Telegram WebApp есть, но user не получен');
+                    console.warn('initDataUnsafe:', tg.initDataUnsafe);
                 }
             } catch(e) {
-                console.error('❌ Ошибка Telegram:', e);
+                console.error('❌ Ошибка при работе с Telegram:', e);
             }
+        } else {
+            console.warn('❌ Telegram WebApp не найден!');
+            console.warn('Это не WebApp или открыто не через бота');
         }
-
-        // ЕСЛИ НЕТ TELEGRAM - БЕРЕМ ИЗ LOCALSTORAGE
+        
+        // Если нет - берем из localStorage или создаем
         if (!userId) {
             const savedId = localStorage.getItem('bzu_user_id');
             if (savedId) {
                 userId = parseInt(savedId);
                 userName = localStorage.getItem('bzu_user_name') || 'Гость';
-                console.log('📦 Из localStorage:', userId, userName);
+                console.log('📦 Загружено из localStorage:', { userId, userName });
+            } else {
+                // НЕ СОЗДАЕМ НОВОГО! Просто показываем ошибку
+                console.error('❌ Нет пользователя! Откройте приложение через бота.');
+                userId = null;
+                userName = 'Ошибка';
+                document.getElementById('userName').textContent = 'Ошибка: открой через бота';
+                document.getElementById('userAvatar').textContent = '❌';
             }
         }
-
-        // ЕСЛИ ВСЕ ЕЩЕ НЕТ - СОЗДАЕМ ВРЕМЕННОГО
-        if (!userId) {
-            userId = Date.now();
-            userName = 'Гость';
-            localStorage.setItem('bzu_user_id', userId);
-            localStorage.setItem('bzu_user_name', userName);
-            console.log('🆕 Создан временный:', userId);
+        
+        if (userId) {
+            document.getElementById('userName').textContent = userName;
+            document.getElementById('userAvatar').textContent = userName[0].toUpperCase();
         }
-
-        document.getElementById('userName').textContent = userName;
-        document.getElementById('userAvatar').textContent = userName[0].toUpperCase();
-
-        console.log('👤 Итоговый пользователь:', { userId, userName, isTelegramUser });
+        
+        console.log('👤 Итоговый пользователь:', { userId, userName });
 
         // ============ ФУНКЦИЯ СИНХРОНИЗАЦИИ ============
         function syncTelegram() {
