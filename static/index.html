@@ -881,27 +881,19 @@
             if (user) {
                 userId = user.id;
                 userName = user.first_name || 'Гость';
-                document.getElementById('userName').textContent = userName;
-                document.getElementById('userAvatar').textContent = userName[0].toUpperCase();
-                console.log('👤 Пользователь из Telegram:', userId, userName);
+                console.log('👤 Получены данные из Telegram:', { userId, userName });
             } else {
-                // Если Telegram есть, но пользователь не получен - пытаемся получить из localStorage
+                console.warn('⚠️ Telegram есть, но пользователь не получен');
+                // Пробуем получить из localStorage
                 const savedUserId = localStorage.getItem('bzu_user_id');
                 if (savedUserId) {
                     userId = parseInt(savedUserId);
                     userName = localStorage.getItem('bzu_user_name') || 'Гость';
-                } else {
-                    // Создаем временного пользователя
-                    userId = Date.now();
-                    userName = 'Гость';
-                    localStorage.setItem('bzu_user_id', userId);
-                    localStorage.setItem('bzu_user_name', userName);
                 }
-                document.getElementById('userName').textContent = userName;
-                document.getElementById('userAvatar').textContent = userName[0].toUpperCase();
             }
         } else {
-            // Если НЕ Telegram WebApp - используем localStorage
+            // Не Telegram - используем localStorage
+            console.warn('⚠️ Не Telegram WebApp');
             const savedUserId = localStorage.getItem('bzu_user_id');
             if (savedUserId) {
                 userId = parseInt(savedUserId);
@@ -912,11 +904,19 @@
                 localStorage.setItem('bzu_user_id', userId);
                 localStorage.setItem('bzu_user_name', userName);
             }
-            document.getElementById('userName').textContent = userName;
-            document.getElementById('userAvatar').textContent = userName[0].toUpperCase();
         }
         
-        console.log('👤 Итоговый пользователь:', userId, userName);
+        // Сохраняем в DOM
+        document.getElementById('userName').textContent = userName;
+        document.getElementById('userAvatar').textContent = userName[0].toUpperCase();
+        
+        console.log('👤 Итоговый пользователь:', { userId, userName });
+        
+        // Сохраняем в localStorage если это не Гость
+        if (userName !== 'Гость') {
+            localStorage.setItem('bzu_user_id', userId);
+            localStorage.setItem('bzu_user_name', userName);
+        }
 
         // ============ API ============
         async function apiCall(url, options = {}) {
@@ -1695,11 +1695,13 @@
         function closeApp() {
             console.log('🔒 Закрываем приложение...');
             
+            // Сохраняем план
             savePlanToServer();
             
+            // Сохраняем БЖУ
             const data = {
                 user_id: userId,
-                user_name: userName,
+                user_name: userName !== 'Гость' ? userName : null,
                 protein: parseFloat(document.getElementById('protein').value) || 0,
                 fat: parseFloat(document.getElementById('fat').value) || 0,
                 carbs: parseFloat(document.getElementById('carbs').value) || 0,
@@ -1711,25 +1713,34 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
-            }).catch(err => console.error('❌ Ошибка при закрытии:', err));
+            }).then(() => {
+                console.log('✅ Данные сохранены при закрытии');
+            }).catch(err => {
+                console.error('❌ Ошибка при закрытии:', err);
+            });
             
+            // Закрываем через 500ms
             setTimeout(() => {
                 try {
                     if (tg && tg.close) {
                         tg.close();
                     } else if (window.close) {
                         window.close();
+                    } else {
+                        console.log('ℹ️ Не удалось закрыть окно');
+                        // Показываем сообщение
+                        showToast('Нажмите назад для выхода', 'info');
                     }
                 } catch (e) {
-                    console.log('ℹ️ Не удалось закрыть окно');
+                    console.log('ℹ️ Не удалось закрыть окно:', e);
+                    showToast('Нажмите назад для выхода', 'info');
                 }
-            }, 300);
+            }, 500);
         }
 
         // ============ БЖУ ============
         async function loadUserData() {
             if (!userId) {
-                // Если нет userId, создаем новый
                 userId = Date.now();
                 userName = 'Гость';
                 localStorage.setItem('bzu_user_id', userId);
@@ -1742,10 +1753,13 @@
             try {
                 console.log('📥 Загружаем данные пользователя:', userId, 'с именем:', userName);
                 
-                // ВАЖНО: передаем ТОЛЬКО если имя не "Гость"
+                // ВАЖНО: Всегда передаем имя, если оно не "Гость"
                 let url = `/api/user/${userId}`;
                 if (userName && userName !== 'Гость') {
                     url += `?first_name=${encodeURIComponent(userName)}`;
+                    console.log('📤 Передаем имя на сервер:', userName);
+                } else {
+                    console.warn('⚠️ Имя "Гость" - не передаем на сервер');
                 }
                 
                 const data = await apiCall(url);
@@ -1756,8 +1770,17 @@
                 }
         
                 console.log('✅ Данные пользователя загружены:', data);
-                limits = data.limits;
                 
+                // Проверяем, есть ли имя в ответе
+                if (data.user && data.user.first_name && data.user.first_name !== 'Гость') {
+                    userName = data.user.first_name;
+                    document.getElementById('userName').textContent = userName;
+                    document.getElementById('userAvatar').textContent = userName[0].toUpperCase();
+                    localStorage.setItem('bzu_user_name', userName);
+                    console.log('👤 Имя обновлено из базы:', userName);
+                }
+                
+                limits = data.limits;
                 const record = data.today_record || {};
                 userData = {
                     protein: record.protein || 0,
@@ -1766,16 +1789,6 @@
                     fiber: record.fiber || 0,
                     calories: record.calories || 0
                 };
-                
-                console.log('📊 Загружены данные за сегодня:', userData);
-        
-                // Обновляем имя пользователя из базы, если оно отличается
-                if (data.user && data.user.first_name && data.user.first_name !== userName) {
-                    userName = data.user.first_name;
-                    document.getElementById('userName').textContent = userName;
-                    document.getElementById('userAvatar').textContent = userName[0].toUpperCase();
-                    localStorage.setItem('bzu_user_name', userName);
-                }
         
                 const fields = ['protein', 'fat', 'carbs', 'fiber', 'calories'];
                 fields.forEach(f => {
@@ -1888,15 +1901,12 @@
                 return;
             }
             
-            // Сохраняем в localStorage
-            localStorage.setItem('bzu_user_id', userId);
-            if (userName && userName !== 'Гость') {
-                localStorage.setItem('bzu_user_name', userName);
-            }
+            // Всегда передаем имя, если оно не "Гость"
+            const nameToSend = (userName && userName !== 'Гость') ? userName : null;
             
             const data = {
                 user_id: userId,
-                user_name: userName !== 'Гость' ? userName : null, // Не передаем "Гость"
+                user_name: nameToSend,
                 protein: parseFloat(document.getElementById('protein').value) || 0,
                 fat: parseFloat(document.getElementById('fat').value) || 0,
                 carbs: parseFloat(document.getElementById('carbs').value) || 0,
@@ -1931,7 +1941,6 @@
                 showToast('❌ Ошибка сохранения', 'error');
             }
         }
-
         async function resetToday() {
             if (!confirm('Сбросить данные за сегодня?')) return;
             const data = { 
