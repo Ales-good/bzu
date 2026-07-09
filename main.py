@@ -11,22 +11,12 @@ import time
 import asyncio
 from datetime import date
 
-
-
 from database_mysql import (
     init_db, get_or_create_user, save_bzu_record, 
     get_today_records, get_user_record, get_user_limits,
     get_all_users, update_limits,
     save_plan_record, get_plan_record, get_plan_history,
     get_user_history, update_user_name
-)
-
-from database_mysql import (
-    init_db, get_or_create_user, save_bzu_record, 
-    get_today_records, get_user_record, get_user_limits,
-    get_all_users, update_limits,
-    save_plan_record, get_plan_record, get_plan_history,
-    get_user_history
 )
 
 print("🔧 Инициализация БД...")
@@ -51,6 +41,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # ============ МОДЕЛИ ============
 class BZUData(BaseModel):
     user_id: int
+    user_name: Optional[str] = None  # <-- ДОБАВЛЕНО
     protein: float = 0
     fat: float = 0
     carbs: float = 0
@@ -73,6 +64,7 @@ class LimitsData(BaseModel):
 
 class PlanData(BaseModel):
     user_id: int
+    user_name: Optional[str] = None  # <-- ДОБАВЛЕНО
     plan_data: dict
     record_date: Optional[str] = None
 
@@ -104,6 +96,10 @@ async def get_user(user_id: int, first_name: str = None):
 @app.post("/api/save")
 async def save_data(data: BZUData):
     try:
+        # Если передано имя пользователя - обновляем
+        if data.user_name:
+            update_user_name(data.user_id, data.user_name)
+        
         save_bzu_record(
             data.user_id,
             data.protein,
@@ -115,6 +111,7 @@ async def save_data(data: BZUData):
         )
         return {"status": "success", "message": "Данные сохранены"}
     except Exception as e:
+        print(f"❌ Ошибка сохранения: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/api/today")
@@ -159,27 +156,6 @@ def get_status(value, min_val, max_val):
 async def get_users():
     return get_all_users()
 
-@app.get("/api/user/{user_id}")
-async def get_user(user_id: int, first_name: str = None):
-    user = get_or_create_user(user_id, first_name=first_name)
-    
-    # Если имя передано и оно отличается от сохранённого — обновляем
-    if first_name and user.get('first_name') != first_name:
-        update_user_name(user_id, first_name)
-        user['first_name'] = first_name
-    
-    limits = get_user_limits(user_id)
-    today_record = get_user_record(user_id)
-    
-    return {
-        "user": user,
-        "limits": limits,
-        "today_record": today_record or {
-            "protein": 0, "fat": 0, "carbs": 0, "fiber": 0, "calories": 0
-        }
-    }
-
-
 @app.post("/api/limits")
 async def update_limits_endpoint(data: LimitsData):
     try:
@@ -200,7 +176,11 @@ async def save_plan(data: PlanData):
     try:
         print(f"📥 Сохраняем план для user_id={data.user_id}")
         
-        # ПРОВЕРЯЕМ, существует ли пользователь
+        # Если передано имя пользователя - обновляем
+        if data.user_name:
+            update_user_name(data.user_id, data.user_name)
+        
+        # Проверяем, существует ли пользователь
         user = get_or_create_user(data.user_id)
         if not user:
             raise HTTPException(status_code=400, detail="Пользователь не найден")
