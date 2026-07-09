@@ -78,8 +78,8 @@ async def index():
     return FileResponse("static/index.html")
 
 @app.get("/api/user/{user_id}")
-async def get_user(user_id: int):
-    user = get_or_create_user(user_id)
+async def get_user(user_id: int, first_name: str = None):
+    user = get_or_create_user(user_id, first_name=first_name)
     limits = get_user_limits(user_id)
     today_record = get_user_record(user_id)
     
