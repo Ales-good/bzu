@@ -266,17 +266,21 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     print(f"📩 /start от {user.first_name} (ID: {user.id}) в чате: {chat.type if chat else 'unknown'}")
     
-    webapp_button = InlineKeyboardButton(
-        "📊 Открыть дневник БЖУ",
-        web_app=WebAppInfo(url=WEBAPP_URL)
-    )
+    # Кнопка для открытия WebApp
+    keyboard = [[
+        InlineKeyboardButton(
+            "📊 Открыть дневник БЖУ",
+            web_app=WebAppInfo(url=WEBAPP_URL)
+        )
+    ]]
     
-    stats_button = InlineKeyboardButton(
-        "📈 Статистика сегодня",
-        callback_data="stats"
-    )
-    
-    keyboard = [[webapp_button], [stats_button]]
+    # Кнопка статистики
+    keyboard.append([
+        InlineKeyboardButton(
+            "📈 Статистика сегодня",
+            callback_data="stats"
+        )
+    ])
     
     if chat and chat.type in ['group', 'supergroup']:
         text = (
