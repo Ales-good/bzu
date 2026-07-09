@@ -107,7 +107,15 @@ def init_db():
     conn.close()
 
 # ============ ПОЛЬЗОВАТЕЛИ ============
-
+def update_user_name(user_id: int, first_name: str):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE users SET first_name = %s WHERE user_id = %s
+    ''', (first_name, user_id))
+    conn.commit()
+    conn.close()
+    
 def get_or_create_user(user_id: int, username: str = None, first_name: str = None, last_name: str = None) -> Dict:
     conn = get_db()
     cursor = conn.cursor()
