@@ -266,44 +266,32 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     print(f"📩 /start от {user.first_name} (ID: {user.id}) в чате: {chat.type if chat else 'unknown'}")
     
-    # Кнопка для открытия WebApp
+    # ПРОСТАЯ КНОПКА - ТОЛЬКО ССЫЛКА
     keyboard = [[
         InlineKeyboardButton(
-            "📊 Открыть дневник БЖУ",
+            "📊 Открыть дневник",
             web_app=WebAppInfo(url=WEBAPP_URL)
         )
     ]]
     
-    # Кнопка статистики
+    # Вторая кнопка - callback
     keyboard.append([
         InlineKeyboardButton(
-            "📈 Статистика сегодня",
+            "📈 Статистика",
             callback_data="stats"
         )
     ])
     
     if chat and chat.type in ['group', 'supergroup']:
         text = (
-            "👋 Привет! Я бот для учета БЖУ в этой группе.\n\n"
-            "📝 Нажми на кнопку ниже, чтобы открыть дневник.\n"
-            "Там ты сможешь:\n"
-            "✅ Вводить свои показатели (БЖУ + калории)\n"
-            "📈 Смотреть графики динамики\n"
-            "🏆 Отмечать план выполнения\n\n"
-            "💡 Команды:\n"
-            "/start - Главное меню\n"
-            "/stats - Статистика за сегодня\n"
-            "/help - Помощь"
+            "👋 Привет! Я бот для учета БЖУ.\n\n"
+            "📝 Нажми кнопку ниже, чтобы открыть дневник."
         )
     else:
         text = (
             "👋 Привет! Я бот для учета БЖУ.\n\n"
-            "📝 Нажми на кнопку ниже, чтобы открыть дневник.\n"
-            "Добавь меня в группу, чтобы сравнивать результаты!\n\n"
-            "💡 Команды:\n"
-            "/start - Главное меню\n"
-            "/stats - Статистика за сегодня\n"
-            "/help - Помощь"
+            "📝 Нажми кнопку ниже, чтобы открыть дневник.\n"
+            "Добавь меня в группу, чтобы сравнивать результаты!"
         )
     
     await update.message.reply_text(
@@ -342,17 +330,9 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Помощь"""
     await update.message.reply_text(
         "🤖 <b>Команды бота:</b>\n\n"
-        "/start - Открыть главное меню\n"
+        "/start - Главное меню\n"
         "/stats - Статистика за сегодня\n"
-        "/help - Помощь\n\n"
-        "📝 <b>Как пользоваться:</b>\n"
-        "1. Нажми «Открыть дневник БЖУ»\n"
-        "2. Введи свои показатели\n"
-        "3. Отметь выполнение плана\n"
-        "4. Сохрани данные\n\n"
-        "📊 <b>Для групп:</b>\n"
-        "Все участники могут вести свои дневники\n"
-        "Статистика отображается в сравнении",
+        "/help - Помощь",
         parse_mode='HTML'
     )
 
@@ -393,20 +373,21 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
         if update.message.text and f"@{context.bot.username}" in update.message.text:
             await start(update, context)
 
-# ============ ЗАПУСК БОТА В ОТДЕЛЬНОМ ПОТОКЕ С EVENT LOOP ============
+# ============ ЗАПУСК БОТА ============
+# Глобальная переменная для бота
+bot_app = None
+
 def run_bot():
-    """Запускает Telegram бота в отдельном потоке с event loop"""
+    """Запускает Telegram бота"""
+    global bot_app
     try:
-        # Создаем новый event loop для этого потока
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         
         print("🤖 Запуск Telegram бота...")
         
-        # Создаем приложение
         bot_app = Application.builder().token(TELEGRAM_TOKEN).build()
         
-        # Добавляем обработчики
         bot_app.add_handler(CommandHandler("start", start))
         bot_app.add_handler(CommandHandler("help", help_command))
         bot_app.add_handler(CommandHandler("stats", stats_command))
@@ -415,7 +396,10 @@ def run_bot():
         
         print("✅ Обработчики команд добавлены")
         
-        # Запускаем бота с polling в этом event loop
+        # Очищаем вебхук перед запуском
+        loop.run_until_complete(bot_app.bot.delete_webhook(drop_pending_updates=True))
+        
+        # Запускаем polling
         loop.run_until_complete(bot_app.initialize())
         loop.run_until_complete(bot_app.start())
         loop.run_until_complete(bot_app.updater.start_polling(
@@ -423,19 +407,15 @@ def run_bot():
             drop_pending_updates=True
         ))
         
-        print("✅ Бот успешно запущен и слушает сообщения!")
-        
-        # Держим поток живым
+        print("✅ Бот успешно запущен!")
         loop.run_forever()
         
     except Exception as e:
         print(f"❌ Ошибка в боте: {e}")
-        import traceback
-        traceback.print_exc()
 
 # Запускаем бота в отдельном потоке
-bot_thread = threading.Thread(target=run_bot, daemon=True)
-bot_thread.start()
+thread = threading.Thread(target=run_bot, daemon=True)
+thread.start()
 print("✅ Бот запущен в фоновом потоке")
 
 # ============ ЗАПУСК FASTAPI ============
