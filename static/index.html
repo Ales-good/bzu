@@ -240,7 +240,6 @@
         }
         .plan-item .input-count:focus { border-color: rgba(255,255,255,0.3); }
         .plan-item .input-count::placeholder { color: var(--text-secondary); font-size: 11px; }
-
         .input-group {
             margin-bottom: 20px;
             padding: 16px;
@@ -364,14 +363,6 @@
             position: relative;
             overflow: hidden;
         }
-        .btn-primary::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
-            transform: translateX(-100%);
-            transition: transform 0.6s ease;
-        }
         .btn-primary:active { transform: scale(0.97); }
         .btn-secondary {
             width: 100%;
@@ -390,7 +381,6 @@
             transform: scale(0.97);
             background: rgba(255,255,255,0.08);
         }
-
         .stats-grid {
             display: grid;
             grid-template-columns: 1fr 1fr 1fr;
@@ -427,7 +417,6 @@
         .stat-item .status.warn { color: #FFD93D; }
         .stat-item .status.over { color: #FF6B6B; }
         .stat-item .status.empty { color: var(--text-secondary); }
-
         .period-filter {
             display: flex;
             gap: 8px;
@@ -456,7 +445,6 @@
         .period-btn:active { transform: scale(0.95); }
         .chart-container { height: 200px; margin-top: 12px; }
         .chart-container-large { height: 220px; margin-top: 12px; }
-
         .comparison-table {
             width: 100%;
             font-size: 13px;
@@ -490,7 +478,6 @@
         .badge.under { background: rgba(255,217,61,0.15); color: #FFD93D; }
         .badge.over { background: rgba(255,107,107,0.15); color: #FF6B6B; }
         .badge.empty { background: rgba(255,255,255,0.05); color: var(--text-secondary); }
-
         .loading {
             text-align: center;
             padding: 40px 20px;
@@ -506,9 +493,7 @@
             animation: spin 0.8s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
-
         .hidden { display: none !important; }
-
         .toast {
             position: fixed;
             bottom: 80px;
@@ -534,7 +519,6 @@
             from { opacity: 0; transform: translateX(-50%) translateY(20px) scale(0.95); }
             to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
         }
-
         .tg-button {
             position: fixed;
             bottom: 20px;
@@ -561,7 +545,6 @@
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
-
         @media (max-width: 480px) {
             body { padding: 16px; }
             .header h1 { font-size: 24px; }
@@ -792,7 +775,7 @@
     <div id="tabCompare" class="hidden">
         <div class="card">
             <div class="card-title">
-                📈 Динамика
+                📈 Динамика калорий
                 <span class="date" id="periodLabel">за неделю</span>
             </div>
             <div class="period-filter">
@@ -804,7 +787,6 @@
             <div class="chart-container-large">
                 <canvas id="historyCaloriesChart"></canvas>
             </div>
-            <div style="margin-top:16px;text-align:center;font-size:12px;color:var(--text-secondary);">🔥 Калории (ккал) за период</div>
         </div>
 
         <div class="card">
@@ -812,7 +794,6 @@
             <div class="chart-container-large">
                 <canvas id="historyPlanChart"></canvas>
             </div>
-            <div style="margin-top:16px;text-align:center;font-size:12px;color:var(--text-secondary);">✅ Выполненные пункты плана за период</div>
         </div>
 
         <div class="card">
@@ -828,6 +809,7 @@
     <script>
         const API_URL = window.location.origin;
         let userId = null;
+        let userName = 'Гость';
         let userData = { protein: 0, fat: 0, carbs: 0, fiber: 0, calories: 0 };
         let limits = {
             protein_min: 150, protein_max: 200,
@@ -836,24 +818,12 @@
             fiber_min: 10, fiber_max: 20,
             calories_min: 2000, calories_max: 2500
         };
-        let compareChart = null;
         let historyCaloriesChart = null;
         let historyPlanChart = null;
         let currentDays = 7;
         let historyData = null;
 
-        const PLAN_ITEMS = [
-            { id: 'massage', icon: '💆', label: 'Массаж' },
-            { id: 'banya', icon: '🧖', label: 'Баня' },
-            { id: 'pool', icon: '🏊', label: 'Бассейн' },
-            { id: 'no_food', icon: '⏰', label: 'Не ел после 18' },
-            { id: 'pushups', icon: '💪', label: 'Отжимания' },
-            { id: 'squats', icon: '🦵', label: 'Приседания' },
-            { id: 'abs', icon: '🔥', label: 'Пресс' },
-            { id: 'gym', icon: '🏋️', label: 'Зал (силовые)' }
-        ];
-
-        // Telegram
+        // ============ TELEGRAM ============
         const tg = window.Telegram?.WebApp;
         if (tg) {
             tg.expand();
@@ -861,8 +831,9 @@
             const user = tg.initDataUnsafe?.user;
             if (user) {
                 userId = user.id;
-                document.getElementById('userName').textContent = user.first_name || 'Гость';
-                document.getElementById('userAvatar').textContent = (user.first_name || 'Г')[0].toUpperCase();
+                userName = user.first_name || 'Гость';
+                document.getElementById('userName').textContent = userName;
+                document.getElementById('userAvatar').textContent = userName[0].toUpperCase();
             }
         }
 
@@ -1009,7 +980,6 @@
                 return `${parts[2]}.${parts[1]}`;
             });
 
-            // График калорий
             const ctx1 = document.getElementById('historyCaloriesChart').getContext('2d');
             if (historyCaloriesChart) historyCaloriesChart.destroy();
             historyCaloriesChart = new Chart(ctx1, {
@@ -1054,7 +1024,6 @@
                 }
             });
 
-            // График выполнения плана
             const ctx2 = document.getElementById('historyPlanChart').getContext('2d');
             if (historyPlanChart) historyPlanChart.destroy();
             historyPlanChart = new Chart(ctx2, {
@@ -1152,10 +1121,13 @@
                 userId = Date.now();
                 document.getElementById('userName').textContent = 'Тест';
                 document.getElementById('userAvatar').textContent = 'Т';
+                return;
             }
 
             try {
-                const data = await apiCall(`/api/user/${userId}`);
+                // Передаём имя на сервер
+                const url = `/api/user/${userId}?first_name=${encodeURIComponent(userName)}`;
+                const data = await apiCall(url);
                 if (!data) return;
 
                 limits = data.limits;
@@ -1181,7 +1153,6 @@
                 updateProgressBars();
                 await loadPlanFromServer();
 
-                // Загружаем историю для графиков
                 if (!document.getElementById('tabCompare').classList.contains('hidden')) {
                     loadHistory(currentDays);
                     loadComparison();
@@ -1375,7 +1346,7 @@
             }, 2500);
         }
 
-        // ============ AUTO-SAVE БЖУ ============
+        // ============ AUTO-SAVE ============
         document.querySelectorAll('#tabMy .input-group input').forEach(input => {
             input.addEventListener('change', function() {
                 userData[this.id] = parseFloat(this.value) || 0;
