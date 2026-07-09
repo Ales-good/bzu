@@ -9,12 +9,12 @@ import json
 import threading
 from datetime import date
 import os
-from pydantic import BaseModel
 
 from database_mysql import (
     init_db, get_or_create_user, save_bzu_record, 
     get_today_records, get_user_record, get_user_limits,
-    get_all_users, update_limits
+    get_all_users, update_limits,
+    save_plan_record, get_plan_record, get_plan_history
 )
 
 # ============ ПРИНУДИТЕЛЬНО СОЗДАЕМ ТАБЛИЦЫ ============
@@ -59,6 +59,11 @@ class LimitsData(BaseModel):
     carbs_max: float
     fiber_min: float
     fiber_max: float
+
+class PlanData(BaseModel):
+    user_id: int
+    plan_data: dict
+    record_date: Optional[str] = None
 
 # ============ API ============
 @app.get("/")
@@ -151,12 +156,6 @@ async def update_limits_endpoint(data: LimitsData):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-# ============ МОДЕЛЬ ДЛЯ ПЛАНА ============
-class PlanData(BaseModel):
-    user_id: int
-    plan_data: dict
-    record_date: Optional[str] = None
-
 # ============ API ДЛЯ ПЛАНА ============
 @app.post("/api/plan/save")
 async def save_plan(data: PlanData):
@@ -168,18 +167,16 @@ async def save_plan(data: PlanData):
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/api/plan/get/{user_id}")
-async def get_plan(user_id: int, date: Optional[str] = None):
+async def get_plan(user_id: int, record_date: Optional[str] = None):
     """Получает план на дату"""
-    plan = get_plan_record(user_id, date)
+    plan = get_plan_record(user_id, record_date)
     return {"plan": plan or {}}
 
 @app.get("/api/plan/history/{user_id}")
-async def get_plan_history(user_id: int, days: int = 30):
+async def get_plan_history_api(user_id: int, days: int = 30):
     """Получает историю плана"""
     history = get_plan_history(user_id, days)
     return {"history": history}
-
-
 
 # ============ ТЕЛЕГРАМ БОТ ============
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
@@ -194,10 +191,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
     
-    # Логируем для отладки
     print(f"📩 /start от {user.first_name} (ID: {user.id}) в чате: {chat.type if chat else 'unknown'}")
     
-    # Кнопка с WebApp
     keyboard = [[
         InlineKeyboardButton(
             "📊 Открыть дневник БЖУ",
@@ -205,7 +200,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     ]]
     
-    # Сообщение для группы и для лички
     if chat and chat.type in ['group', 'supergroup']:
         text = (
             "👋 Привет! Я бот для учета БЖУ в этой группе.\n\n"
@@ -237,7 +231,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Сводка в чат"""
     records = get_today_records()
     
     if not records or all(r['protein'] == 0 and r['fat'] == 0 and r['carbs'] == 0 and r['fiber'] == 0 for r in records):
@@ -268,47 +261,34 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(message, parse_mode='HTML')
 
 def run_bot():
-    """Запускает Telegram бота с обработкой ошибок"""
     try:
         print(f"🤖 Запуск бота с токеном: {TELEGRAM_TOKEN[:10]}...")
-        
-        # Создаём приложение
         bot_app = Application.builder().token(TELEGRAM_TOKEN).build()
-        
-        # Добавляем обработчики команд
         bot_app.add_handler(CommandHandler("start", start))
         bot_app.add_handler(CommandHandler("help", help_command))
         bot_app.add_handler(CommandHandler("stats", stats_command))
-        
         print("✅ Обработчики команд добавлены")
         print("🤖 Бот запущен и ожидает сообщения...")
-        
-        # Запускаем polling (получение сообщений)
         bot_app.run_polling(allowed_updates=["message", "callback_query"])
-        
     except Exception as e:
         print(f"❌ ОШИБКА в run_bot(): {e}")
         import traceback
         traceback.print_exc()
 
-# ============ ЗАПУСК ============
-if __name__ == "__main__":
-    print("🚀 Запуск приложения...")
-    
-    # Проверяем токен
-    if not TELEGRAM_TOKEN or TELEGRAM_TOKEN == "8704240954:AAG4AV6Wrt_9aQhn400ljcWTNq80gc0LpWM":
-        print("❌ ОШИБКА: TELEGRAM_TOKEN не задан или используется заглушка!")
-        print("💡 Добавь TELEGRAM_TOKEN в переменные окружения на Railway")
-    else:
-        print(f"✅ TELEGRAM_TOKEN задан: {TELEGRAM_TOKEN[:10]}...")
-    
-    # Запускаем бота в отдельном потоке
+# ============ ЗАПУСК БОТА (для Railway) ============
+print("🚀 Railway: запускаю бота...")
+
+if not TELEGRAM_TOKEN or TELEGRAM_TOKEN == "ВАШ_ТОКЕН_ОТ_BOTFATHER":
+    print("❌ ОШИБКА: TELEGRAM_TOKEN не задан или используется заглушка!")
+else:
+    print(f"✅ TELEGRAM_TOKEN задан: {TELEGRAM_TOKEN[:10]}...")
     print("🔄 Запускаю бота в отдельном потоке...")
     bot_thread = threading.Thread(target=run_bot, daemon=True)
     bot_thread.start()
     print("✅ Бот запущен в отдельном потоке")
-    
-    # Берем порт из переменной окружения
+
+# ============ ЗАПУСК ВЕБ-СЕРВЕРА ============
+if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
     print(f"🚀 Сервер запускается на порту {port}")
     uvicorn.run(app, host="0.0.0.0", port=port)
