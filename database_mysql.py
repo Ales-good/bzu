@@ -131,6 +131,10 @@ def get_or_create_user(user_id: int, username: str = None, first_name: str = Non
     user = cursor.fetchone()
     
     if not user:
+        # Если нет имени - используем "Гость" или username
+        if not first_name:
+            first_name = username or f"User {user_id}"
+        
         cursor.execute('''
             INSERT INTO users (user_id, username, first_name, last_name)
             VALUES (%s, %s, %s, %s)
@@ -147,7 +151,7 @@ def get_or_create_user(user_id: int, username: str = None, first_name: str = Non
         print(f"✅ Создан новый пользователь: {user_id} - {first_name}")
     else:
         # Если пользователь существует, но имя не совпадает - обновляем
-        if first_name and user.get('first_name') != first_name:
+        if first_name and user.get('first_name') != first_name and first_name != 'Гость':
             update_user_name(user_id, first_name)
             user['first_name'] = first_name
     
