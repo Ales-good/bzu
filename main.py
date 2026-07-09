@@ -233,7 +233,7 @@ async def get_history(user_id: int, days: int = 90):
         completed_items = 0
         for v in plan_data.values():
             if isinstance(v, dict):
-                if v.get('done', False) or v.get('count', 0) > 0:
+                if v.get('done', False) or v.get('count, 0) > 0:
                     completed_items += 1
             elif v:
                 completed_items += 1 if v else 0
@@ -254,7 +254,6 @@ async def get_history(user_id: int, days: int = 90):
     }
 
 # ============ ТЕЛЕГРАМ БОТ ============
-# Глобальный экземпляр бота
 bot_app = None
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -267,6 +266,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     print(f"📩 /start от {user.first_name} (ID: {user.id}) в чате: {chat.type if chat else 'unknown'}")
     
+    # ТОЛЬКО ОДНА КНОПКА С WEB_APP
     keyboard = [[
         InlineKeyboardButton(
             "📊 Открыть дневник",
@@ -274,6 +274,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     ]]
     
+    # ВТОРАЯ КНОПКА - ОБЫЧНАЯ
     keyboard.append([
         InlineKeyboardButton(
             "📈 Статистика",
@@ -281,10 +282,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     ])
     
-    text = (
-        "👋 Привет! Я бот для учета БЖУ.\n\n"
-        "📝 Нажми кнопку ниже, чтобы открыть дневник."
-    )
+    if chat and chat.type in ['group', 'supergroup']:
+        text = (
+            "👋 Привет! Я бот для учета БЖУ в этой группе.\n\n"
+            "📝 Нажми на кнопку ниже, чтобы открыть дневник.\n"
+            "Там ты сможешь вводить свои показатели и отмечать план."
+        )
+    else:
+        text = (
+            "👋 Привет! Я бот для учета БЖУ.\n\n"
+            "📝 Нажми на кнопку ниже, чтобы открыть дневник.\n"
+            "Добавь меня в группу, чтобы сравнивать результаты!"
+        )
     
     await update.message.reply_text(
         text,
@@ -400,7 +409,6 @@ async def startup():
         await bot_app.initialize()
         await bot_app.start()
         
-        # Устанавливаем вебхук
         await bot_app.bot.set_webhook(WEBHOOK_URL, drop_pending_updates=True)
         print(f"✅ Webhook установлен: {WEBHOOK_URL}")
         
