@@ -269,7 +269,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ТОЛЬКО ОДНА КНОПКА С WEB_APP
     keyboard = [[
         InlineKeyboardButton(
-            "📊 Открыть дневник",
+            "main",
             web_app=WebAppInfo(url=WEBAPP_URL)
         )
     ]]
