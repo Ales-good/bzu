@@ -19,6 +19,10 @@ from database_mysql import (
     get_user_history, update_user_name
 )
 
+# Импорты для Telegram
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo, CallbackQuery
+from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler, MessageHandler, filters
+
 print("🔧 Инициализация БД...")
 init_db()
 print("✅ БД готова")
@@ -41,7 +45,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # ============ МОДЕЛИ ============
 class BZUData(BaseModel):
     user_id: int
-    user_name: Optional[str] = None  # <-- ДОБАВЛЕНО
+    user_name: Optional[str] = None
     protein: float = 0
     fat: float = 0
     carbs: float = 0
@@ -64,15 +68,9 @@ class LimitsData(BaseModel):
 
 class PlanData(BaseModel):
     user_id: int
-    user_name: Optional[str] = None  # <-- ДОБАВЛЕНО
+    user_name: Optional[str] = None
     plan_data: dict
     record_date: Optional[str] = None
-
-class HistoryResponse(BaseModel):
-    dates: List[str]
-    calories: List[float]
-    plan_completed: List[int]
-    plan_total: List[int]
 
 # ============ API ============
 @app.get("/")
@@ -96,7 +94,6 @@ async def get_user(user_id: int, first_name: str = None):
 @app.post("/api/save")
 async def save_data(data: BZUData):
     try:
-        # Если передано имя пользователя - обновляем
         if data.user_name:
             update_user_name(data.user_id, data.user_name)
         
@@ -176,11 +173,9 @@ async def save_plan(data: PlanData):
     try:
         print(f"📥 Сохраняем план для user_id={data.user_id}")
         
-        # Если передано имя пользователя - обновляем
         if data.user_name:
             update_user_name(data.user_id, data.user_name)
         
-        # Проверяем, существует ли пользователь
         user = get_or_create_user(data.user_id)
         if not user:
             raise HTTPException(status_code=400, detail="Пользователь не найден")
@@ -203,7 +198,6 @@ async def get_history(user_id: int, days: int = 90):
     bzu_history = get_user_history(user_id, days)
     plan_history = get_plan_history(user_id, days)
     
-    # Создаём словарь для быстрого доступа к данным по датам
     plan_dict = {}
     for p in plan_history:
         date_str = p['record_date'].isoformat() if hasattr(p['record_date'], 'isoformat') else str(p['record_date'])
@@ -217,7 +211,7 @@ async def get_history(user_id: int, days: int = 90):
     fiber = []
     plan_completed = []
     plan_total = []
-    plan_data_list = []  # Сохраняем все планы для графиков
+    plan_data_list = []
     
     for record in bzu_history:
         date_str = record['record_date']
@@ -228,9 +222,8 @@ async def get_history(user_id: int, days: int = 90):
         carbs.append(float(record['carbs']) if record['carbs'] else 0)
         fiber.append(float(record['fiber']) if record['fiber'] else 0)
         
-        # Считаем выполнение плана на эту дату
         plan_data = plan_dict.get(date_str, {})
-        plan_data_list.append(plan_data)  # Сохраняем для графиков
+        plan_data_list.append(plan_data)
         
         total_items = len(plan_data)
         completed_items = 0
@@ -238,7 +231,7 @@ async def get_history(user_id: int, days: int = 90):
             if isinstance(v, dict):
                 if v.get('done', False) or v.get('count', 0) > 0:
                     completed_items += 1
-            elif v:  # если просто True/False
+            elif v:
                 completed_items += 1 if v else 0
         
         plan_total.append(total_items)
@@ -253,14 +246,12 @@ async def get_history(user_id: int, days: int = 90):
         "fiber": fiber,
         "plan_completed": plan_completed,
         "plan_total": plan_total,
-        "plan_data": plan_data_list  # Добавляем для детальных графиков
+        "plan_data": plan_data_list
     }
 
 # ============ ТЕЛЕГРАМ БОТ ============
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
-from telegram.ext import Application, CommandHandler, ContextTypes
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Приветствие и главное меню"""
     if not update.message:
         return
     
@@ -269,12 +260,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     print(f"📩 /start от {user.first_name} (ID: {user.id}) в чате: {chat.type if chat else 'unknown'}")
     
-    keyboard = [[
-        InlineKeyboardButton(
-            "📊 Открыть дневник БЖУ",
-            web_app=WebAppInfo(url=WEBAPP_URL)
-        )
-    ]]
+    webapp_button = InlineKeyboardButton(
+        "📊 Открыть дневник БЖУ",
+        web_app=WebAppInfo(url=WEBAPP_URL)
+    )
+    
+    stats_button = InlineKeyboardButton(
+        "📈 Статистика сегодня",
+        callback_data="stats"
+    )
+    
+    keyboard = [[webapp_button], [stats_button]]
     
     if chat and chat.type in ['group', 'supergroup']:
         text = (
@@ -283,13 +279,21 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Там ты сможешь:\n"
             "✅ Вводить свои показатели (БЖУ + калории)\n"
             "📈 Смотреть графики динамики\n"
-            "🏆 Отмечать план выполнения"
+            "🏆 Отмечать план выполнения\n\n"
+            "💡 Команды:\n"
+            "/start - Главное меню\n"
+            "/stats - Статистика за сегодня\n"
+            "/help - Помощь"
         )
     else:
         text = (
             "👋 Привет! Я бот для учета БЖУ.\n\n"
             "📝 Нажми на кнопку ниже, чтобы открыть дневник.\n"
-            "Добавь меня в группу, чтобы сравнивать результаты!"
+            "Добавь меня в группу, чтобы сравнивать результаты!\n\n"
+            "💡 Команды:\n"
+            "/start - Главное меню\n"
+            "/stats - Статистика за сегодня\n"
+            "/help - Помощь"
         )
     
     await update.message.reply_text(
@@ -297,33 +301,87 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "🤖 Команды бота:\n"
-        "/start - Открыть главное меню\n"
-        "/help - Помощь\n"
-        "/stats - Сводка за сегодня"
-    )
-
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Показывает статистику за сегодня"""
     records = get_today_records()
-    if not records or all(r['protein'] == 0 and r['fat'] == 0 and r['carbs'] == 0 for r in records):
+    active_records = [r for r in records if r['protein'] + r['fat'] + r['carbs'] + r['fiber'] + r['calories'] > 0]
+    
+    if not active_records:
         await update.message.reply_text("📭 Сегодня никто не ввел данные!")
         return
     
     message = "📊 <b>Сводка за сегодня</b>\n\n"
-    for rec in records:
+    for rec in active_records:
         name = rec['first_name'] or rec['username'] or f"User {rec['user_id']}"
-        total = rec['protein'] + rec['fat'] + rec['carbs']
-        if total == 0:
-            continue
         message += f"👤 <b>{name}</b>\n"
-        message += f"  🍗 Белки: {rec['protein']:.0f}г ({rec['protein_min']:.0f}-{rec['protein_max']:.0f})\n"
-        message += f"  🧈 Жиры: {rec['fat']:.0f}г ({rec['fat_min']:.0f}-{rec['fat_max']:.0f})\n"
-        message += f"  🍞 Углеводы: {rec['carbs']:.0f}г ({rec['carbs_min']:.0f}-{rec['carbs_max']:.0f})\n"
-        message += f"  🔥 Калории: {rec['calories']:.0f}ккал ({rec['calories_min']:.0f}-{rec['calories_max']:.0f})\n\n"
+        if rec['protein'] > 0:
+            message += f"  🍗 Белки: {rec['protein']:.0f}г\n"
+        if rec['fat'] > 0:
+            message += f"  🧈 Жиры: {rec['fat']:.0f}г\n"
+        if rec['carbs'] > 0:
+            message += f"  🍞 Углеводы: {rec['carbs']:.0f}г\n"
+        if rec['fiber'] > 0:
+            message += f"  🥦 Клетчатка: {rec['fiber']:.0f}г\n"
+        if rec['calories'] > 0:
+            message += f"  🔥 Калории: {rec['calories']:.0f}ккал\n"
+        message += "\n"
     
     await update.message.reply_text(message, parse_mode='HTML')
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Помощь"""
+    await update.message.reply_text(
+        "🤖 <b>Команды бота:</b>\n\n"
+        "/start - Открыть главное меню\n"
+        "/stats - Статистика за сегодня\n"
+        "/help - Помощь\n\n"
+        "📝 <b>Как пользоваться:</b>\n"
+        "1. Нажми «Открыть дневник БЖУ»\n"
+        "2. Введи свои показатели\n"
+        "3. Отметь выполнение плана\n"
+        "4. Сохрани данные\n\n"
+        "📊 <b>Для групп:</b>\n"
+        "Все участники могут вести свои дневники\n"
+        "Статистика отображается в сравнении",
+        parse_mode='HTML'
+    )
+
+async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка callback-запросов от кнопок"""
+    query = update.callback_query
+    await query.answer()
+    
+    if query.data == "stats":
+        records = get_today_records()
+        active_records = [r for r in records if r['protein'] + r['fat'] + r['carbs'] + r['fiber'] + r['calories'] > 0]
+        
+        if not active_records:
+            await query.message.reply_text("📭 Сегодня никто не ввел данные!")
+            return
+        
+        message = "📊 <b>Сводка за сегодня</b>\n\n"
+        for rec in active_records:
+            name = rec['first_name'] or rec['username'] or f"User {rec['user_id']}"
+            message += f"👤 <b>{name}</b>\n"
+            if rec['protein'] > 0:
+                message += f"  🍗 Белки: {rec['protein']:.0f}г\n"
+            if rec['fat'] > 0:
+                message += f"  🧈 Жиры: {rec['fat']:.0f}г\n"
+            if rec['carbs'] > 0:
+                message += f"  🍞 Углеводы: {rec['carbs']:.0f}г\n"
+            if rec['fiber'] > 0:
+                message += f"  🥦 Клетчатка: {rec['fiber']:.0f}г\n"
+            if rec['calories'] > 0:
+                message += f"  🔥 Калории: {rec['calories']:.0f}ккал\n"
+            message += "\n"
+        
+        await query.message.reply_text(message, parse_mode='HTML')
+
+async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка сообщений в группах"""
+    if update.message and update.message.chat.type in ['group', 'supergroup']:
+        if update.message.text and f"@{context.bot.username}" in update.message.text:
+            await start(update, context)
 
 # ============ ЗАПУСК ============
 if __name__ == "__main__":
@@ -333,11 +391,13 @@ if __name__ == "__main__":
         print("❌ ОШИБКА: TELEGRAM_TOKEN не задан!")
         exit(1)
     
-    # Создаём приложение бота
     bot_app = Application.builder().token(TELEGRAM_TOKEN).build()
+    
     bot_app.add_handler(CommandHandler("start", start))
     bot_app.add_handler(CommandHandler("help", help_command))
     bot_app.add_handler(CommandHandler("stats", stats_command))
+    bot_app.add_handler(CallbackQueryHandler(handle_callback))
+    bot_app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.GROUPS, handle_group_message))
     
     print("✅ Обработчики команд добавлены")
     print("🤖 Запуск Telegram бота...")
