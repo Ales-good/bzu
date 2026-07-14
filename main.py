@@ -112,21 +112,17 @@ async def index():
 
 @app.get("/api/user/{user_id}")
 async def get_user(user_id: int, first_name: str = None):
-    # Если имя не передано или это "Гость"/"Тест" - не создаем нового пользователя
-    if not first_name or first_name in ['Гость', 'Тест', '']:
-        # Проверяем, существует ли пользователь
-        user = get_or_create_user(user_id, first_name='Гость')
-        limits = get_user_limits(user_id)
-        today_record = get_user_record(user_id)
-        return {
-            "user": user,
-            "limits": limits,
-            "today_record": today_record or {
-                "protein": 0, "fat": 0, "carbs": 0, "fiber": 0, "calories": 0
-            }
-        }
+    print(f"🔍 Запрос пользователя: user_id={user_id}, first_name={first_name}")
     
+    # ПРИНУДИТЕЛЬНО создаём пользователя
     user = get_or_create_user(user_id, first_name=first_name)
+    print(f"✅ Пользователь получен/создан: {user}")
+    
+    # Если имя передано и отличается — обновляем
+    if first_name and user.get('first_name') != first_name:
+        update_user_name(user_id, first_name)
+        user['first_name'] = first_name
+    
     limits = get_user_limits(user_id)
     today_record = get_user_record(user_id)
     
@@ -137,6 +133,54 @@ async def get_user(user_id: int, first_name: str = None):
             "protein": 0, "fat": 0, "carbs": 0, "fiber": 0, "calories": 0
         }
     }
+
+async function savePlanToServer() {
+    if (!userId) {
+        console.warn('⚠️ Нет userId');
+        return;
+    }
+
+    // Проверяем, существует ли пользователь в БД
+    try {
+        const checkResponse = await fetch(`/api/user/${userId}`);
+        if (!checkResponse.ok) {
+            // Если пользователя нет — создаём
+            console.log('⏳ Пользователь не найден, создаём...');
+            const createResponse = await fetch(`/api/user/${userId}?first_name=${encodeURIComponent(userName)}`);
+            if (!createResponse.ok) {
+                console.error('❌ Не удалось создать пользователя');
+                return;
+            }
+            console.log('✅ Пользователь создан');
+        }
+    } catch (e) {
+        console.error('❌ Ошибка проверки пользователя:', e);
+        return;
+    }
+
+    // Теперь сохраняем план
+    const planData = getPlanData();
+    const today = new Date().toISOString().split('T')[0];
+    try {
+        const response = await fetch('/api/plan/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                user_id: userId, 
+                plan_data: planData, 
+                record_date: today 
+            })
+        });
+        if (response.ok) {
+            console.log('✅ План сохранён');
+        } else {
+            const err = await response.json();
+            console.error('❌ Ошибка сохранения плана:', err);
+        }
+    } catch (error) {
+        console.error('❌ Ошибка:', error);
+    }
+}
 
 @app.post("/api/save")
 async def save_data(data: BZUData):
