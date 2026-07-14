@@ -1,12 +1,14 @@
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional
 import uvicorn
+import threading
 import os
-import logging
+import time
+import asyncio
 from datetime import date
 
 from database_mysql import (
@@ -14,16 +16,7 @@ from database_mysql import (
     get_today_records, get_user_record, get_user_limits,
     get_all_users, update_limits,
     save_plan_record, get_plan_record, get_plan_history,
-    get_user_history, update_user_name, get_db
-)
-
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
-from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
-
-# Настройка логов
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
+    get_user_history, update_user_name
 )
 
 print("🔧 Инициализация БД...")
@@ -32,7 +25,6 @@ print("✅ БД готова")
 
 TELEGRAM_TOKEN = "8704240954:AAG4AV6Wrt_9aQhn400ljcWTNq80gc0LpWM"
 WEBAPP_URL = os.getenv("WEBAPP_URL", "https://bzu-production.up.railway.app")
-WEBHOOK_URL = f"{WEBAPP_URL}/webhook"
 
 app = FastAPI()
 
@@ -46,39 +38,9 @@ app.add_middleware(
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# ============ ОЧИСТКА ТЕСТОВЫХ ПОЛЬЗОВАТЕЛЕЙ ============
-def cleanup_test_users():
-    """Удаляет пользователей с именами 'Гость' и 'Тест' у которых нет активности"""
-    try:
-        conn = get_db()
-        cursor = conn.cursor()
-        
-        # Удаляем пользователей с именами 'Гость' или 'Тест'
-        # у которых нет записей БЖУ (все показатели = 0)
-        cursor.execute("""
-            DELETE FROM users 
-            WHERE (first_name = 'Гость' OR first_name = 'Тест' OR first_name IS NULL OR first_name = '')
-            AND user_id NOT IN (
-                SELECT DISTINCT user_id FROM bzu_records 
-                WHERE protein > 0 OR fat > 0 OR carbs > 0 OR fiber > 0 OR calories > 0
-            )
-        """)
-        
-        deleted_count = cursor.rowcount
-        conn.commit()
-        conn.close()
-        
-        if deleted_count > 0:
-            print(f"🧹 Удалено {deleted_count} тестовых пользователей")
-        return deleted_count
-    except Exception as e:
-        print(f"❌ Ошибка очистки: {e}")
-        return 0
-
 # ============ МОДЕЛИ ============
 class BZUData(BaseModel):
     user_id: int
-    user_name: Optional[str] = None
     protein: float = 0
     fat: float = 0
     carbs: float = 0
@@ -101,24 +63,25 @@ class LimitsData(BaseModel):
 
 class PlanData(BaseModel):
     user_id: int
-    user_name: Optional[str] = None
     plan_data: dict
     record_date: Optional[str] = None
 
 # ============ API ============
 @app.get("/")
 async def index():
-    return FileResponse("static/index.html")
+    response = FileResponse("static/index.html")
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 @app.get("/api/user/{user_id}")
 async def get_user(user_id: int, first_name: str = None):
     print(f"🔍 Запрос пользователя: user_id={user_id}, first_name={first_name}")
     
-    # ПРИНУДИТЕЛЬНО создаём пользователя
     user = get_or_create_user(user_id, first_name=first_name)
     print(f"✅ Пользователь получен/создан: {user}")
     
-    # Если имя передано и отличается — обновляем
     if first_name and user.get('first_name') != first_name:
         update_user_name(user_id, first_name)
         user['first_name'] = first_name
@@ -134,61 +97,9 @@ async def get_user(user_id: int, first_name: str = None):
         }
     }
 
-async function savePlanToServer() {
-    if (!userId) {
-        console.warn('⚠️ Нет userId');
-        return;
-    }
-
-    // Проверяем, существует ли пользователь в БД
-    try {
-        const checkResponse = await fetch(`/api/user/${userId}`);
-        if (!checkResponse.ok) {
-            # Если пользователя нет - создаём  # <-- ЗДЕСЬ ОБЫЧНЫЙ ДЕФИС
-            console.log('⏳ Пользователь не найден, создаём...');
-            const createResponse = await fetch(`/api/user/${userId}?first_name=${encodeURIComponent(userName)}`);
-            if (!createResponse.ok) {
-                console.error('❌ Не удалось создать пользователя');
-                return;
-            }
-            console.log('✅ Пользователь создан');
-        }
-    } catch (e) {
-        console.error('❌ Ошибка проверки пользователя:', e);
-        return;
-    }
-
-    // Теперь сохраняем план
-    const planData = getPlanData();
-    const today = new Date().toISOString().split('T')[0];
-    try {
-        const response = await fetch('/api/plan/save', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                user_id: userId, 
-                plan_data: planData, 
-                record_date: today 
-            })
-        });
-        if (response.ok) {
-            console.log('✅ План сохранён');
-        } else {
-            const err = await response.json();
-            console.error('❌ Ошибка сохранения плана:', err);
-        }
-    } catch (error) {
-        console.error('❌ Ошибка:', error);
-    }
-}
-
 @app.post("/api/save")
 async def save_data(data: BZUData):
     try:
-        # Если имя "Гость" или "Тест" - не обновляем его
-        if data.user_name and data.user_name not in ['Гость', 'Тест', '']:
-            update_user_name(data.user_id, data.user_name)
-        
         save_bzu_record(
             data.user_id,
             data.protein,
@@ -200,7 +111,6 @@ async def save_data(data: BZUData):
         )
         return {"status": "success", "message": "Данные сохранены"}
     except Exception as e:
-        print(f"❌ Ошибка сохранения: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/api/today")
@@ -265,10 +175,6 @@ async def save_plan(data: PlanData):
     try:
         print(f"📥 Сохраняем план для user_id={data.user_id}")
         
-        # Если имя "Гость" или "Тест" - не обновляем его
-        if data.user_name and data.user_name not in ['Гость', 'Тест', '']:
-            update_user_name(data.user_id, data.user_name)
-        
         user = get_or_create_user(data.user_id)
         if not user:
             raise HTTPException(status_code=400, detail="Пользователь не найден")
@@ -285,47 +191,31 @@ async def get_plan(user_id: int, record_date: Optional[str] = None):
     plan = get_plan_record(user_id, record_date)
     return {"plan": plan or {}}
 
+@app.get("/api/plan/history/{user_id}")
+async def get_plan_history_api(user_id: int, days: int = 30):
+    history = get_plan_history(user_id, days)
+    return {"history": history}
+
 @app.get("/api/history/{user_id}")
 async def get_history(user_id: int, days: int = 90):
-    """Получает историю БЖУ и плана для графиков"""
     bzu_history = get_user_history(user_id, days)
     plan_history = get_plan_history(user_id, days)
     
-    plan_dict = {}
-    for p in plan_history:
-        date_str = p['record_date'].isoformat() if hasattr(p['record_date'], 'isoformat') else str(p['record_date'])
-        plan_dict[date_str] = p['plan_data']
+    plan_dict = {p['record_date']: p['plan_data'] for p in plan_history}
     
     dates = []
     calories = []
-    protein = []
-    fat = []
-    carbs = []
-    fiber = []
     plan_completed = []
     plan_total = []
-    plan_data_list = []
     
     for record in bzu_history:
-        date_str = record['record_date']
+        date_str = record['record_date'].isoformat() if hasattr(record['record_date'], 'isoformat') else record['record_date']
         dates.append(date_str)
         calories.append(float(record['calories']) if record['calories'] else 0)
-        protein.append(float(record['protein']) if record['protein'] else 0)
-        fat.append(float(record['fat']) if record['fat'] else 0)
-        carbs.append(float(record['carbs']) if record['carbs'] else 0)
-        fiber.append(float(record['fiber']) if record['fiber'] else 0)
         
         plan_data = plan_dict.get(date_str, {})
-        plan_data_list.append(plan_data)
-        
         total_items = len(plan_data)
-        completed_items = 0
-        for v in plan_data.values():
-            if isinstance(v, dict):
-                if v.get('done', False) or v.get('count', 0) > 0:
-                    completed_items += 1
-            elif v:
-                completed_items += 1 if v else 0
+        completed_items = sum(1 for v in plan_data.values() if v.get('done', False) or v.get('count', 0) > 0)
         
         plan_total.append(total_items)
         plan_completed.append(completed_items)
@@ -333,20 +223,15 @@ async def get_history(user_id: int, days: int = 90):
     return {
         "dates": dates,
         "calories": calories,
-        "protein": protein,
-        "fat": fat,
-        "carbs": carbs,
-        "fiber": fiber,
         "plan_completed": plan_completed,
-        "plan_total": plan_total,
-        "plan_data": plan_data_list
+        "plan_total": plan_total
     }
 
 # ============ ТЕЛЕГРАМ БОТ ============
-bot_app = None
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+from telegram.ext import Application, CommandHandler, ContextTypes
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Приветствие и главное меню"""
     if not update.message:
         return
     
@@ -355,152 +240,95 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     print(f"📩 /start от {user.first_name} (ID: {user.id}) в чате: {chat.type if chat else 'unknown'}")
     
-    # В ЛИЧНЫХ СООБЩЕНИЯХ - web_app кнопка
-    if chat and chat.type == 'private':
-        keyboard = [[
-            InlineKeyboardButton(
-                "📊 Открыть дневник",
-                web_app=WebAppInfo(url=WEBAPP_URL)
-            )
-        ]]
-        
-        text = (
-            "👋 Привет! Я бот для учета БЖУ.\n\n"
-            "📝 Нажми на кнопку ниже, чтобы открыть дневник прямо в Telegram.\n\n"
-            "Добавь меня в группу, чтобы сравнивать результаты!\n\n"
-            "💡 Команды:\n"
-            "/start - Главное меню\n"
-            "/stats - Статистика за сегодня\n"
-            "/help - Помощь"
+    keyboard = [[
+        InlineKeyboardButton(
+            "📊 Открыть дневник БЖУ",
+            web_app=WebAppInfo(url=WEBAPP_URL)
         )
-        
-        await update.message.reply_text(
-            text,
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode='HTML'
-        )
+    ]]
     
-    # В ГРУППАХ - ссылка
-    else:
+    if chat and chat.type in ['group', 'supergroup']:
         text = (
             "👋 Привет! Я бот для учета БЖУ в этой группе.\n\n"
-            "📝 Открой дневник по ссылке (откроется внутри Telegram):\n"
-            f"<a href=\"{WEBAPP_URL}\">📊 Открыть дневник БЖУ</a>\n\n"
+            "📝 Нажми на кнопку ниже, чтобы открыть дневник.\n"
             "Там ты сможешь:\n"
             "✅ Вводить свои показатели (БЖУ + калории)\n"
             "📈 Смотреть графики динамики\n"
-            "🏆 Отмечать план выполнения\n\n"
-            "💡 Команды:\n"
-            "/start - Главное меню\n"
-            "/stats - Статистика за сегодня\n"
-            "/help - Помощь"
+            "🏆 Отмечать план выполнения"
         )
-        
-        await update.message.reply_text(
-            text,
-            parse_mode='HTML',
-            disable_web_page_preview=False
+    else:
+        text = (
+            "👋 Привет! Я бот для учета БЖУ.\n\n"
+            "📝 Нажми на кнопку ниже, чтобы открыть дневник.\n"
+            "Добавь меня в группу, чтобы сравнивать результаты!"
         )
+    
+    await update.message.reply_text(
+        text,
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "🤖 Команды бота:\n"
+        "/start - Открыть главное меню\n"
+        "/help - Помощь\n"
+        "/stats - Сводка за сегодня"
+    )
 
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Показывает статистику за сегодня"""
     records = get_today_records()
-    active_records = [r for r in records if r['protein'] + r['fat'] + r['carbs'] + r['fiber'] + r['calories'] > 0]
-    
-    if not active_records:
+    if not records or all(r['protein'] == 0 and r['fat'] == 0 and r['carbs'] == 0 for r in records):
         await update.message.reply_text("📭 Сегодня никто не ввел данные!")
         return
     
     message = "📊 <b>Сводка за сегодня</b>\n\n"
-    for rec in active_records:
+    for rec in records:
         name = rec['first_name'] or rec['username'] or f"User {rec['user_id']}"
+        total = rec['protein'] + rec['fat'] + rec['carbs']
+        if total == 0:
+            continue
         message += f"👤 <b>{name}</b>\n"
-        if rec['protein'] > 0:
-            message += f"  🍗 Белки: {rec['protein']:.0f}г\n"
-        if rec['fat'] > 0:
-            message += f"  🧈 Жиры: {rec['fat']:.0f}г\n"
-        if rec['carbs'] > 0:
-            message += f"  🍞 Углеводы: {rec['carbs']:.0f}г\n"
-        if rec['fiber'] > 0:
-            message += f"  🥦 Клетчатка: {rec['fiber']:.0f}г\n"
-        if rec['calories'] > 0:
-            message += f"  🔥 Калории: {rec['calories']:.0f}ккал\n"
-        message += "\n"
+        message += f"  🍗 Белки: {rec['protein']:.0f}г ({rec['protein_min']:.0f}-{rec['protein_max']:.0f})\n"
+        message += f"  🧈 Жиры: {rec['fat']:.0f}г ({rec['fat_min']:.0f}-{rec['fat_max']:.0f})\n"
+        message += f"  🍞 Углеводы: {rec['carbs']:.0f}г ({rec['carbs_min']:.0f}-{rec['carbs_max']:.0f})\n"
+        message += f"  🔥 Калории: {rec['calories']:.0f}ккал ({rec['calories_min']:.0f}-{rec['calories_max']:.0f})\n\n"
     
     await update.message.reply_text(message, parse_mode='HTML')
 
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Помощь"""
-    await update.message.reply_text(
-        "🤖 <b>Команды бота:</b>\n\n"
-        "/start - Главное меню\n"
-        "/stats - Статистика за сегодня\n"
-        "/help - Помощь\n\n"
-        "📝 Открой дневник по ссылке:\n"
-        f"<a href=\"{WEBAPP_URL}\">📊 Открыть дневник БЖУ</a>",
-        parse_mode='HTML'
-    )
-
-async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка сообщений в группах"""
-    if update.message and update.message.chat.type in ['group', 'supergroup']:
-        if update.message.text and f"@{context.bot.username}" in update.message.text:
-            await start(update, context)
-
-# Webhook endpoint
-@app.post("/webhook")
-async def webhook(request: Request):
-    """Принимает обновления от Telegram"""
-    global bot_app
-    if bot_app is None:
-        return Response("Bot not initialized", status_code=500)
-    
-    try:
-        data = await request.json()
-        update = Update.de_json(data, bot_app.bot)
-        await bot_app.process_update(update)
-        return Response("OK", status_code=200)
-    except Exception as e:
-        print(f"❌ Webhook error: {e}")
-        return Response("Error", status_code=500)
-
-# ============ ЗАПУСК БОТА ============
-@app.on_event("startup")
-async def startup():
-    """Запускает бота при старте сервера"""
-    global bot_app
-    try:
-        print("🤖 Инициализация бота...")
-        bot_app = Application.builder().token(TELEGRAM_TOKEN).build()
-        
-        bot_app.add_handler(CommandHandler("start", start))
-        bot_app.add_handler(CommandHandler("help", help_command))
-        bot_app.add_handler(CommandHandler("stats", stats_command))
-        bot_app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.GROUPS, handle_group_message))
-        
-        await bot_app.initialize()
-        await bot_app.start()
-        
-        await bot_app.bot.set_webhook(WEBHOOK_URL, drop_pending_updates=True)
-        print(f"✅ Webhook установлен: {WEBHOOK_URL}")
-        
-        # Очищаем тестовых пользователей при старте
-        cleanup_test_users()
-        
-        print("✅ Бот успешно запущен!")
-    except Exception as e:
-        print(f"❌ Ошибка запуска бота: {e}")
-
-@app.on_event("shutdown")
-async def shutdown():
-    """Останавливает бота"""
-    global bot_app
-    if bot_app:
-        await bot_app.stop()
-        print("✅ Бот остановлен")
-
-# ============ ЗАПУСК FASTAPI ============
+# ============ ЗАПУСК ============
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 8080))
+    print("🚀 Запуск приложения...")
+    
+    if not TELEGRAM_TOKEN:
+        print("❌ ОШИБКА: TELEGRAM_TOKEN не задан!")
+        exit(1)
+    
+    bot_app = Application.builder().token(TELEGRAM_TOKEN).build()
+    bot_app.add_handler(CommandHandler("start", start))
+    bot_app.add_handler(CommandHandler("help", help_command))
+    bot_app.add_handler(CommandHandler("stats", stats_command))
+    
+    print("✅ Обработчики команд добавлены")
+    print("🤖 Запуск Telegram бота...")
+    
+    def run_bot_in_thread():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            bot_app.run_polling(
+                allowed_updates=["message", "callback_query"],
+                stop_signals=[]
+            )
+        except Exception as e:
+            print(f"❌ Ошибка в боте: {e}")
+    
+    bot_thread = threading.Thread(target=run_bot_in_thread, daemon=True)
+    bot_thread.start()
+    print("✅ Бот запущен в фоновом потоке")
+    
+    time.sleep(0.5)
+    
+    port = int(os.getenv("PORT", 8000))
     print(f"🚀 Сервер запускается на порту {port}")
     uvicorn.run(app, host="0.0.0.0", port=port)
