@@ -144,7 +144,7 @@ async function savePlanToServer() {
     try {
         const checkResponse = await fetch(`/api/user/${userId}`);
         if (!checkResponse.ok) {
-            // Если пользователя нет — создаём
+            # Если пользователя нет - создаём  # <-- ЗДЕСЬ ОБЫЧНЫЙ ДЕФИС
             console.log('⏳ Пользователь не найден, создаём...');
             const createResponse = await fetch(`/api/user/${userId}?first_name=${encodeURIComponent(userName)}`);
             if (!createResponse.ok) {
