@@ -1084,15 +1084,26 @@
 
         async function loadUserData() {
             if (!userId) {
-                showToast('❌ Нет пользователя, нажмите "Синхронизировать"', 'error');
-                return;
+                // Если userId не получен из Telegram — генерируем временный
+                userId = Date.now();
+                document.getElementById('userName').textContent = 'Тест';
+                document.getElementById('userAvatar').textContent = 'Т';
             }
-            
+        
             try {
-                console.log('📥 Загружаем данные для:', userId);
-                const data = await apiCall(`/api/user/${userId}`);
-                if (!data) return;
-
+                console.log('🔄 Загружаем данные для user_id:', userId);
+                
+                // 1. СОЗДАЁМ пользователя на сервере (или получаем существующего)
+                const url = `/api/user/${userId}?first_name=${encodeURIComponent(userName)}`;
+                const data = await apiCall(url);
+                
+                if (!data) {
+                    console.error('❌ Не удалось создать/получить пользователя');
+                    return;
+                }
+        
+                console.log('✅ Пользователь загружен:', data.user);
+        
                 limits = data.limits;
                 const record = data.today_record || {};
                 userData = {
@@ -1102,29 +1113,40 @@
                     fiber: record.fiber || 0,
                     calories: record.calories || 0
                 };
-
+        
+                // Обновляем UI
                 const fields = ['protein', 'fat', 'carbs', 'fiber', 'calories'];
                 fields.forEach(f => {
-                    document.getElementById(f).value = userData[f] || 0;
-                    document.getElementById(`limit${f.charAt(0).toUpperCase() + f.slice(1)}Min`).textContent = limits[`${f}_min`] || 0;
-                    document.getElementById(`limit${f.charAt(0).toUpperCase() + f.slice(1)}Max`).textContent = limits[`${f}_max`] || 0;
-                    document.getElementById(`${f}MinLabel`).textContent = limits[`${f}_min`] || 0;
-                    document.getElementById(`${f}MaxLabel`).textContent = limits[`${f}_max`] || 0;
+                    const el = document.getElementById(f);
+                    if (el) el.value = userData[f] || 0;
+                    
+                    const minEl = document.getElementById(`limit${f.charAt(0).toUpperCase() + f.slice(1)}Min`);
+                    const maxEl = document.getElementById(`limit${f.charAt(0).toUpperCase() + f.slice(1)}Max`);
+                    const minLabel = document.getElementById(`${f}MinLabel`);
+                    const maxLabel = document.getElementById(`${f}MaxLabel`);
+                    
+                    if (minEl) minEl.textContent = limits[`${f}_min`] || 0;
+                    if (maxEl) maxEl.textContent = limits[`${f}_max`] || 0;
+                    if (minLabel) minLabel.textContent = limits[`${f}_min`] || 0;
+                    if (maxLabel) maxLabel.textContent = limits[`${f}_max`] || 0;
                 });
-
+        
                 updateStats();
                 updateProgressBars();
+        
+                // 2. ТЕПЕРЬ загружаем план (пользователь уже существует!)
                 await loadPlanFromServer();
-
+        
+                // 3. Загружаем историю, если на вкладке "Сравнение"
                 if (!document.getElementById('tabCompare').classList.contains('hidden')) {
-                    loadAnalytics(currentDays);
+                    loadHistory(currentDays);
+                    loadComparison();
                 }
                 
-                if (userName !== 'Гость') {
-                    showToast(`👋 Привет, ${userName}!`, 'success');
-                }
+                console.log('✅ Данные загружены');
             } catch (error) {
                 console.error('❌ Ошибка загрузки:', error);
+                showToast('Ошибка загрузки данных', 'error');
             }
         }
 
