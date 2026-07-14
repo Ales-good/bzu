@@ -131,42 +131,36 @@ def get_or_create_user(user_id: int, username: str = None, first_name: str = Non
     user = cursor.fetchone()
     
     if not user:
-        # Создаем пользователя
+        # Создаём пользователя
         cursor.execute('''
             INSERT INTO users (user_id, username, first_name, last_name)
             VALUES (%s, %s, %s, %s)
         ''', (user_id, username, first_name, last_name))
         
-        # Создаем лимиты
+        # Создаём лимиты, только если их ещё нет
         cursor.execute('''
-            INSERT INTO limits (user_id, protein_min, protein_max, fat_min, fat_max, carbs_min, carbs_max, fiber_min, fiber_max, calories_min, calories_max)
+            INSERT IGNORE INTO limits (user_id, protein_min, protein_max, fat_min, fat_max, carbs_min, carbs_max, fiber_min, fiber_max, calories_min, calories_max)
             VALUES (%s, 150, 200, 70, 80, 80, 100, 10, 20, 2000, 2500)
         ''', (user_id,))
         
         conn.commit()
+        
         cursor.execute("SELECT * FROM users WHERE user_id = %s", (user_id,))
         user = cursor.fetchone()
-        print(f"✅ Создан новый пользователь: {user_id} - {first_name}")
     else:
-        # Если пользователь существует, но имя не совпадает - обновляем
-        if first_name and user.get('first_name') != first_name and first_name not in ['Гость', 'Тест']:
-            update_user_name(user_id, first_name)
-            user['first_name'] = first_name
-        
-        # Проверяем, есть ли лимиты у пользователя
+        # Если пользователь есть, проверяем, есть ли у него лимиты
         cursor.execute("SELECT * FROM limits WHERE user_id = %s", (user_id,))
         limits = cursor.fetchone()
         if not limits:
-            # Если лимитов нет - создаем
+            # Создаём лимиты, если их нет
             cursor.execute('''
-                INSERT INTO limits (user_id, protein_min, protein_max, fat_min, fat_max, carbs_min, carbs_max, fiber_min, fiber_max, calories_min, calories_max)
+                INSERT IGNORE INTO limits (user_id, protein_min, protein_max, fat_min, fat_max, carbs_min, carbs_max, fiber_min, fiber_max, calories_min, calories_max)
                 VALUES (%s, 150, 200, 70, 80, 80, 100, 10, 20, 2000, 2500)
             ''', (user_id,))
             conn.commit()
-            print(f"✅ Созданы лимиты для пользователя: {user_id}")
     
     conn.close()
-    return user
+    return dict(user)
 
 def get_all_users() -> List[Dict]:
     conn = get_db()
